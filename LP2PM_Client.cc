@@ -230,12 +230,12 @@ int P2PIM_Client::listenForAction(){
 void LP2PM_Client::udpMessageReceived(){
 	if(DEBUG) cout << "P2PIM_Client::udpMessageReceived()" << endl;
 	int result = 0;
-	struct sockaddr_in client_address;
-	socklen_t clientLn = sizeof(client_address);
+	struct sockaddr_in user_addr;
+	socklen_t userLn = sizeof(user_addr);
 	UDP_in_packet.clearPacket();
 	result = recvfrom(UDP_socket, UDP_in_packet.getData(0),
 					  P2PIM_DEFAULT_MAX_PACKET_SIZE, 0,
-					  (struct sockaddr*)&client_address, &clientLn);
+					  (struct sockaddr*)&user_addr, &userLn);
 	if(result < 0){
 		cout << "[Error] P2PIM_Client::udpMessageReceived() "
 		<<"- UDP Recvfrom returned error" << endl;
@@ -256,7 +256,7 @@ void LP2PM_Client::udpMessageReceived(){
 	if(DEBUG) {
 		cout << "P2PIM_Client::udpMessageReceived() - UDP Received "
 		<< result << " Bytes from "
-		<< inet_ntoa(client_address.sin_addr) << endl;
+		<< inet_ntoa(user_addr.sin_addr) << endl;
 		cout << "P2PIM_Client::udpMessageReceived() - UDP Message Type: "
 		<< UDP_in_packet.getType() << " - PID: "
 		<< UDP_in_packet.getPID() << endl;
@@ -267,7 +267,7 @@ void LP2PM_Client::udpMessageReceived(){
 	if(CONSOLE_DEBUG){
 		sprintf(display.NEW_CONSOLE_LINE,
 				"UDP Received (%d Bytes from %s)",
-				result,inet_ntoa(client_address.sin_addr));
+				result,inet_ntoa(user_addr.sin_addr));
 		cout << "MOVING: " << display.NEW_CONSOLE_LINE << endl;
 		display.addNewConsoleLine();
 	}
@@ -287,12 +287,10 @@ void LP2PM_Client::tcpMessageReceived(){
 	}
 	int result = 0;
 	socklen_t clientLn;
-	clientLn = sizeof(tcp_client_addr);
+	clientLn = sizeof(TCP_addr);
 	TCP_in_packet.clearPacket();
 	P2PIM_User user;
-	user.TCP_socket = accept(TCP_socket,
-								(struct sockaddr*)&tcp_client_addr,
-								&clientLn);
+	user.TCP_socket = accept(TCP_socket,(struct sockaddr*)&TCP_addr, &clientLn);
 	if(user.TCP_socket < 0){
 		cerr << "[Error] P2PIM_Client::listenForAction() "
 		<<"- TCP Accept returned error" << endl;
@@ -300,7 +298,7 @@ void LP2PM_Client::tcpMessageReceived(){
 	}
 	
 	result = read(user.TCP_socket,user.incoming_packet.getData(0),
-				  P2PIM_DEFAULT_MAX_PACKET_SIZE-1);
+				  P2PIM_DEFAULT_MAX_PACKET_SIZE);
 	if(result < 0){
 		cerr << "[Error] P2PIM_Client::listenForAction() "
 		<<"- TCP read returned error" << endl;
@@ -312,7 +310,7 @@ void LP2PM_Client::tcpMessageReceived(){
 		<< user.incoming_packet.getType() << " - PID: "
 		<< user.incoming_packet.getPID() << endl;
 	}
-	tcpMsgHandler(&TCP_in_packet,users.findUser(tcp_client_addr));
+	tcpMsgHandler(&TCP_in_packet,users.findUser(TCP_addr));
 }
 
 int LP2PM_Client::udpMsgHandler(LP2PM_Packet* packet){
@@ -469,17 +467,17 @@ int LP2PM_Client::tcpMsgHandler(LP2PM_Packet* packet, LP2PM_User* user){
 	return -1;
 }
 
-int LP2PM_Client::requestMsgHandler(const char* username,
-									  const char* hostname,
-									  LP2PM_User* user){
-	if(DEBUG) cout << "LP2PM_Client::establishMsgHandler()" << endl;
-	// Ask User if they would like to establish a connection
+int LP2PM_Client::requestMsgHandler(	const char* username,
+										const char* hostname,
+										LP2PM_User* user){
+	if(DEBUG) cout << "LP2PM_Client::requestMsgHandler()" << endl;
+	// Ask User if they would like to request a connection
 
 	/*
 	 *	Get User Input on this
 	 */
 	if(user_availability_status < 0){
-		return sendUserUnavailableMsg(user);
+		return sendDeclineMsg(user);
 	}
 	users.retrieve(username,hostname)->userEstablished();
 	return sendAcceptComMsg(user);
@@ -504,8 +502,8 @@ int LP2PM_Client::declineMsgHandler(LP2PM_User* user){
 		cerr << "LP2PM_Client::userUnavailableMsgHandler() - No User found\n";
 		return -1;
 	}
-	//user->userUnavailable();
-	user->closeTCPSocket();
+	user->userUnavailable();
+	close(user->TCP_socket);
 	return 0;
 }
 	
@@ -539,7 +537,7 @@ int LP2PM_Client::discontinueMsgHandler(LP2PM_User* user){
 		cerr << "LP2PM_Client::discontinueMsgHandler() - No User found\n";
 		return -1;
 	}
-	user->closeTCPSocket();
+	close(user->TCP_socket);
 	return 0;
 }
 
@@ -670,7 +668,7 @@ int LP2PM_Client::sendAcceptComMsg(LP2PM_User* user){
 			cout << "LP2PM_Client::sendAcceptComMsg() - sendTCPPacket returned -1 -"
 			<< " closing user socket...";
 		}
-		user->closeTCPSocket();
+		close(user->TCP_socket);
 	}
 	return r;
 }
@@ -702,7 +700,7 @@ int LP2PM_Client::sendDeclineMsg(LP2PM_User* user){
 			cout << "LP2PM_Client::sendDeclineMsg() - sendTCPPacket returned -1 -"
 			<< " closing user socket...";
 		}
-		user->closeTCPSocket();
+		close(user->TCP_socket);
 	}
 	return r;
 }
@@ -734,7 +732,7 @@ int LP2PM_Client::sendDataMsg(LP2PM_User* user, char* msg){
 			cout << "LP2PM_Client::sendDataMsg() - sendTCPPacket returned -1 -"
 			<< " closing user socket...";
 		}
-		user->closeTCPSocket();
+		close(user->TCP_socket);
 	}
 	return r;
 }
@@ -766,7 +764,7 @@ int LP2PM_Client::sendMessage(LP2PM_User* user, char* msg){
 			cout << "LP2PM_Client::sendMessage() - sendTCPPacket returned -1 -"
 			<< " closing user socket...";
 		}
-		user->closeTCPSocket();
+		close(user->TCP_socket);
 	}
 	return r;
 }
@@ -798,7 +796,7 @@ int LP2PM_Client::sendDiscontinueComMsg(LP2PM_User* user){
 			cout << "LP2PM_Client::sendDiscontinueComMsg() - sendTCPPacket returned -1 -"
 			<< " closing user socket...";
 		}
-		user->closeTCPSocket();
+		close(user->TCP_socket);
 	}
 	return r;	
 }
@@ -874,7 +872,7 @@ void LP2PM_Client::closeClient(){
 	if(DEBUG) cout << "LP2PM_Client::closeClient()" << endl;
 	users.clearList();
 	close(UDP_socket);
-	close(tcp_socket);
+	close(TCP_socket);
 }
 
 /*
