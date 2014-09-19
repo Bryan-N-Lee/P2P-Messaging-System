@@ -105,6 +105,14 @@ public:
 	int		getSize();
 	
 	/*
+	 *	Set the size of a packet
+	 *	For packets that are created from incoming packets
+	 *
+	 *	@param	int			packet size
+	 */
+	void	setSize(int);
+	
+	/*
 	 *	Prints the packet's contents (for debugging)
 	 */
 	void	printPacket();
@@ -305,8 +313,8 @@ public:
 							<< *(p.getData(2)) << *(p.getData(3)) << "\n";
 		out << "Type: " << p.getType() << "\n";
 		if(p.isDisM() || p.isRM() || p.isCM()){
-			out << "UDP Port: " << p.getUDP() << "\n"
-				<< "TCP Port: " << p.getTCP() << "\n"
+			out << "UDP Port: " << p.getUDPPort() << "\n"
+				<< "TCP Port: " << p.getTCPPort() << "\n"
 				<< "Hostname: " << p.getHostname() << "\n"
 				<< "Username: " << p.getUsername() << "\n";
 		}

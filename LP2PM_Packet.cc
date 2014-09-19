@@ -25,6 +25,11 @@ LP2PM_Packet::~LP2PM_Packet(){}
 int LP2PM_Packet::getSize()
 { return packet_size; }
 
+void LP2PM_Packet::setSize(int s){
+	if(s < 0 || LP2PM_DEFAULT_MAX_PACKET_SIZE <= s) return;
+	packet_size = s;
+}
+
 /*
  *	Clear the packet's contents
  *
@@ -52,8 +57,8 @@ void LP2PM_Packet::printPacket(){
 			printf(" %-12s %d\n","Packet ID:",packet_ID);
 			printf(" %-12s %d\n","Packet Size:",packet_size);
 			printf(" %-12s %d\n","Packet Type:",getType());
-			printf(" %-12s %d\n","UDP Port:",getUDP());
-			printf(" %-12s %d\n","TCP Port:",getTCP());
+			printf(" %-12s %d\n","UDP Port:",getUDPPort());
+			printf(" %-12s %d\n","TCP Port:",getTCPPort());
 			printf(" %-12s %s\n","Hostname:",getHostname());
 			printf(" %-12s %s\n","Username:",getUsername());
 			cout << "~~~~~~~~~~~~~~~~~~~~~~~\n";
@@ -261,10 +266,10 @@ BYTE LP2PM_Packet::getByte(int offset)
 uint16_t LP2PM_Packet::getType()
 { return (getByte(LP2PM_TYPE_POS_L) << 8) | getByte(LP2PM_TYPE_POS_R); }
 
-uint16_t LP2PM_Packet::getUDP()
+uint16_t LP2PM_Packet::getUDPPort()
 { return (getByte(LP2PM_UDP_POS_L) << 8) | getByte(LP2PM_UDP_POS_R); }
 
-uint16_t LP2PM_Packet::getTCP()
+uint16_t LP2PM_Packet::getTCPPort()
 { return (getByte(LP2PM_TCP_POS_L) << 8) | getByte(LP2PM_TCP_POS_R); }
 
 /*
