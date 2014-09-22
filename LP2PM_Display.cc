@@ -340,11 +340,10 @@ void LP2PM_Display::addNewLine(const char* line)
 void LP2PM_Display::parseToLineArguments()
 {	for(int i = 0; i < MAX_TO_LINE_ARGUS; ++i)
 		bzero(toArguments[i],MAX_TO_LINE_LEN);
-		//memset(toArguments[i],0,MAX_TO_LINE_LEN);
 	string t = "";
 	int k = 0;
 	for(int i = 0; i < to_line.size(); ++i)
-	{	if(to_line[i] == '@')
+	{	if(to_line[i] == ' ')
 		{	strcpy(toArguments[k],t.c_str());
 			++k; t = "";
 		}
@@ -352,6 +351,17 @@ void LP2PM_Display::parseToLineArguments()
 	}
 	strcpy(toArguments[k],t.c_str());
 	nToArgus = k+1;
+}
+
+void LP2PM_Display::parseUserHost(const char* cstring, char* user, char* host)
+{	if(!strchr(cstring,'@')) strcpy(user,cstring);
+	string s = "";
+	int i = 0;
+	for(; cstring[i]; ++i){
+		if(cstring[i] == '@'){ strcpy(user,s.c_str()); break; }
+		else s+=cstring[i];
+	}
+	if(cstring[i] && cstring[i+1]) strcpy(host,cstring+i+1);
 }
 
 /*
@@ -387,6 +397,12 @@ void LP2PM_Display::addCharacter(char ch)
 		}
 	}
 }
+
+void LP2PM_Display::toUpperCase(char* cstring)
+{	for(int i = 0; cstring[i]; ++i) cstring[i] = toupper(cstring[i]); }
+
+void LP2PM_Display::toUpperCase(char* cstring, int n)
+{	for(int i = 0; i < n; ++i) cstring[i] = toupper(cstring[i]); }
 
 void LP2PM_Display::setHostname(const char* h) { strcpy(hostname,h); }
 
@@ -473,40 +489,30 @@ void LP2PM_Display::updateDisplay(char ch)
 // 5 - change user availiablity status
 int LP2PM_Display::getToLine(char* dest_user, char* dest_host)
 {	parseToLineArguments();
-	if(strcmp(toArguments[0],(char*)"establish") == 0 ||
-	   strcmp(toArguments[0],(char*)"Establish") == 0)
-	{	strcpy(dest_user,toArguments[1]);
+	toUpperCase(toArguments[0]);
+	char* to_command = toArguments[0];
+	if(!strcmp(to_command,(char*)REQUEST_COMMAND)){
+		strcpy(dest_user,toArguments[1]);
 		strcpy(dest_host,toArguments[2]);
 		return 1;
 	}
-	if(strcmp(toArguments[0],(char*)"disconnect") == 0 ||
-	   strcmp(toArguments[0],(char*)"Disconnect") == 0)
-	{	if(strcmp(toArguments[1],(char*)"all") == 0 ||
-		   strcmp(toArguments[1],(char*)"All") == 0)
-		{	strcpy(dest_user,toArguments[1]);
-			return 2;
-		}
+	if(!strcmp(to_command,(char*)ACCEPT_COMMAND)){
+		
+	}
+	if(!strcmp(to_command,(char*)DECLINE_COMMAND)){
+		
+	}
+	if(!strcmp(to_command,(char*)DISCONTINUE_COMMAND)){
 		strcpy(dest_user,toArguments[1]);
-		strcpy(dest_host,toArguments[2]);
 		return 2;
 	}
-	if(strcmp(toArguments[0],(char*)"all") == 0 ||
-	   strcmp(toArguments[0],(char*)"All") == 0)
-	{	strcpy(dest_user,toArguments[0]);
-		return 3;
+	if(!strcmp(to_command,(char*)AWAY_COMMAND)){
+		
 	}
-	if(strcmp(toArguments[0],(char*)"requestuserlist") == 0 ||
-	   strcmp(toArguments[0],(char*)"Requestuserlist") == 0)
-	{	strcpy(dest_user,toArguments[1]);
-		strcpy(dest_host,toArguments[2]);
-		return 4;
+	if(!strcmp(to_command,(char*)HERE_COMMAND)){
+		
 	}
-	if(strcmp(toArguments[0],(char*)"changestaus") == 0) return 5;
-	if(nToArgus <= 1)
-	{	strcpy(dest_user,"");
-		strcpy(dest_host,"");
-		return -1;
-	}
+
 	strcpy(dest_user,toArguments[0]);
 	strcpy(dest_host,toArguments[1]);
 	return 0;

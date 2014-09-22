@@ -153,6 +153,16 @@ private:
 	void parseToLineArguments();
 	
 	/*
+	 *	Given a cstring like [user]@[host], this function will parse it into
+	 *	user and host
+	 *
+	 *	@param1	const char*		[user]@[host] cstring
+	 *	@param2	char*			user buffer
+	 *	@param3	char*			host buffer
+	 */
+	void parseUserHost(const char*);
+	
+	/*
 	 *	Called when the [backspace]/[delete] key is pressed
 	 */
 	void backspace();
@@ -163,6 +173,17 @@ private:
 	 *	@param	char		key pressed
 	 */
 	void addCharacter(char);
+	
+	/*
+	 *	Convert cstring to Uppercase
+	 *	@param1	char*		cstring
+	 */
+	void toUpperCase(char*);
+	/*
+	 *	@param1	char*		cstring
+	 *	@param2	int			# of chars to convert to uppercase
+	 */
+	void toUpperCase(char*, int);
 	
 public:
 	LP2PM_Display();
@@ -255,6 +276,11 @@ public:
 	 *	@param1	char*		destination username
 	 *	@param2	char*		destination hostname
 	 *	@return	int			type of argument submitted
+	 *						Type 1: 
+	 *						Type 2:
+	 *						Type 3:
+	 *						Type 4:
+	 *						Type 5:
 	 */
 	int	 getToLine(			char*,char*); // FIXIT
 	
