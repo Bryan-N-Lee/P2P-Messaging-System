@@ -47,6 +47,21 @@
 #define		DEBUG							0
 #define		CONSOLE_DEBUG					1
 
+// Commands
+#define		REQUEST_COMMAND					"REQUEST"
+#define		ACCEPT_COMMAND					"ACCEPT"
+#define		DECLINE_COMMAND					"DECLINE"
+#define		DISCONTINUE_COMMAND				"DISCONTINUE"
+#define		AWAY_COMMAND					"AWAY"
+#define		HERE_COMMAND					"HERE"
+#define		TO_TYPE_REQUEST					1
+#define		TO_TYPE_ACCEPT					2
+#define		TO_TYPE_DECLINE					3
+#define		TO_TYPE_DISCONTINUE				4
+#define		TO_TYPE_AWAY					5
+#define		TO_TYPE_HERE					6
+#define		TO_TYPE_MESSAGE					0
+
 /* ---- LP2PM_Packet ---- */
 #define		LP2PM_TYPE_DISCOVERY			1
 #define		LP2PM_TYPE_REPLY				2
@@ -76,9 +91,9 @@
 #define		MSG_HISTORY_LENGTH				12
 
 /* ---- LP2PM_Client ---- */
-//#define		MAX_USERS						64
-#define		P2PIM_DEFAULT_INIT_TIMEOUT		5000		// 5 seconds
-#define		P2PIM_DEFAULT_MAX_TIMEOUT		60000		// 50 seconds
-#define		P2PIM_DEFAULT_UDP_PORT			50550
-#define		P2PIM_DEFAULT_TCP_PORT			50551
-#define 	P2PIM_DEFAULT_MAX_USERS			64
+#define		LP2PM_DEFAULT_MAX_USERS			(HOST_WIN_HEIGHT)
+#define		LP2PM_DEFAULT_INIT_TIMEOUT		5000		// 5 seconds
+#define		LP2PM_DEFAULT_MAX_TIMEOUT		60000		// 50 seconds
+#define		LP2PM_DEFAULT_UDP_PORT			50550
+#define		LP2PM_DEFAULT_TCP_PORT			50551
+#define 	LP2PM_DEFAULT_MAX_USERS			64
