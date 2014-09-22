@@ -1,16 +1,16 @@
 #include "LP2PM_User.h"
 #include "LP2PM_Macros.h"
 
-struct ListNode{
+struct UserNode{
 	LP2PM_User user;
-	ListNode* next;
-	ListNode(LP2PM_User u, ListNode* n):
+	UserNode* next;
+	UserNode(LP2PM_User u, UserNode* n):
 	user(u),next(n){}
 };
 
 class UserList{
 private:
-	ListNode* head;
+	UserNode* head;
 	int size;
 public:
 	UserList();
@@ -33,8 +33,9 @@ public:
 	 *	Insert given user
 	 *
 	 *	@param	LP2PM_User	The new user
+	 *	@return	int			new size of list on success, -1 on fail
 	 */
-	void insert( LP2PM_User );
+	int insert( LP2PM_User );
 	
 	/*
 	 *	Remove user based on username and hostname
@@ -75,6 +76,13 @@ public:
 	 *	@return	LP2PM_User*		pointer to user
 	 */
 	LP2PM_User* findUser( sockaddr_in& );
+	
+	/*
+	 *	returns the root/head of the list
+	 *
+	 *	@return	UserNode*		head of list
+	 */
+	UserNode* root() const;
 	
 	/*
 	 *	empties the list
