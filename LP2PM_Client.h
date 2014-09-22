@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <stdio.h>
+#include <curses.h>
 
 class LP2PM_Client{
 private:
@@ -109,6 +110,16 @@ public:
 	 *	Reads and stores the incoming TCP packet
 	 */
 	void TCPMessageReceived();
+	
+	/*
+	 *	Handles a Keyboard event
+	 *	If:
+	 *		F1:			quit
+	 *		[return]:	get info from LP2PM_Display
+	 *		other:		send to LP2PM_Display
+	 */
+	int keyboardReceived();
+	
 	int  UDPHandler(LP2PM_Packet* );
 	int  TCPHandler(LP2PM_Packet*, LP2PM_User* );
 
