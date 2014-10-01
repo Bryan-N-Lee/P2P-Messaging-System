@@ -17,6 +17,7 @@ user_availability_status(1){
 
 	strcpy(this->username,username);
 	if(DEBUG) cout << "LP2PM_Client::LP2PM_Client() - Client Constructed" << endl;
+	display = LP2PM_Display::Instance();
 }
 
 LP2PM_Client::LP2PM_Client(const char* username){
@@ -27,6 +28,24 @@ LP2PM_Client::LP2PM_Client(const char* username){
 LP2PM_Client::~LP2PM_Client(){
 	if(DEBUG) cout << "LP2PM_Client::~LP2PM_Client()" << endl;
 	close(UDP_socket); close(TCP_socket);
+	LP2PM_Display::Destroy();
+}
+
+int LP2PM_Client::init(){
+	display->setHostname(hostname);
+	display->setUsername(username);
+	establishUDPserver();
+	establishTCPserver();
+}
+
+int LP2PM_Client::start(){
+	display->init();
+	listenForAction();
+	// Return and shutdown client
+	broadcastClosingMsg();
+	closeClient();
+	//endwin();
+	LP2PM_Display::Destroy();
 }
 
 bool LP2PM_Client::checkSockaddr(sockaddr_in const &a, sockaddr_in const &b){ return a.sin_addr.s_addr == b.sin_addr.s_addr; }
@@ -258,11 +277,11 @@ void LP2PM_Client::UDPMessageReceived(){
 		cout << endl;
 	}
 	if(CONSOLE_DEBUG){
-		sprintf(display.NEW_CONSOLE_LINE,
+		sprintf(display->NEW_CONSOLE_LINE,
 				"UDP Received (%d Bytes from %s)",
 				result,inet_ntoa(user_addr.sin_addr));
-		cout << "MOVING: " << display.NEW_CONSOLE_LINE << endl;
-		display.addNewConsoleLine();
+		cout << "MOVING: " << display->NEW_CONSOLE_LINE << endl;
+		display->addNewConsoleLine();
 	}
 	udpMsgHandler(&UDP_in_packet);
 }
@@ -326,9 +345,9 @@ int LP2PM_Client::keyboardReceived(){
 				char dest_user[MAX_TO_LINE_LEN];
 				char dest_host[MAX_TO_LINE_LEN];
 				char dest_msg[MAX_MSG_LENGTH];
-				int toType = display.getToLine(dest_user,dest_host);
-				display.getMsgLine(dest_msg,MAX_MSG_LENGTH);
-				display.updateDisplay(RXChar);
+				int toType = display->getToLine(dest_user,dest_host);
+				display->getMsgLine(dest_msg,MAX_MSG_LENGTH);
+				display->updateDisplay(RXChar);
 				if(toType < 0){
 					if(DEBUG) cout << "P2PIM_Client::listenForAction() - Unknown Command\n";
 					return 0;
@@ -337,7 +356,7 @@ int LP2PM_Client::keyboardReceived(){
 					for(int i = 0; i < users.getSize(); ++i){
 						P2PIM_User* temp = users.getUser(i);
 						handleSendingDataMsg(temp,dest_msg);
-						display.addNewMessage(username,
+						display->addNewMessage(username,
 											  temp->getUsername(),
 											  dest_msg);
 					}
@@ -351,22 +370,22 @@ int LP2PM_Client::keyboardReceived(){
 					user_availability_status *= -1;
 					if(CONSOLE_DEBUG){
 						if(user_availability_status > 0)
-							sprintf(display.NEW_CONSOLE_LINE,
+							sprintf(display->NEW_CONSOLE_LINE,
 									"User Status changed to Available");
 						else if(user_availability_status < 0)
-							sprintf(display.NEW_CONSOLE_LINE,
+							sprintf(display->NEW_CONSOLE_LINE,
 									"User Status changed to Unavailable");
-						display.addNewConsoleLine();
+						display->addNewConsoleLine();
 					}
 					return 0;
 				}
 				P2PIM_User* u = users.retrieve(dest_user,dest_host);
 				if(!u){
 					if(CONSOLE_DEBUG){
-						sprintf(display.NEW_CONSOLE_LINE,
+						sprintf(display->NEW_CONSOLE_LINE,
 								"[Error] Could not find %s@%s",
 								dest_user,dest_host);
-						display.addNewConsoleLine();
+						display->addNewConsoleLine();
 					}
 					if(DEBUG){
 						cout << "[Error] P2PIM_Client::"
@@ -378,7 +397,7 @@ int LP2PM_Client::keyboardReceived(){
 				switch(toType){
 					case 0:
 						handleSendingDataMsg(u,dest_msg);
-						display.addNewMessage(username,dest_user,
+						display->addNewMessage(username,dest_user,
 											  dest_msg);
 						break;
 					case 1:
@@ -397,7 +416,7 @@ int LP2PM_Client::keyboardReceived(){
 			}
 			default:
 				// print character to screen
-				display.updateDisplay(RXChar);
+				display->updateDisplay(RXChar);
 		}
 	}
 	return 0;
@@ -444,7 +463,7 @@ int LP2PM_Client::discoveryMsgHandler(LP2PM_Packet* packet){
 	user.init(packet->getUsername(), packet->getHostname(),
 			  packet->getUDPPort(), packet->getTCPPort());
 	users.insert(user);
-	display.addNewHost(user.getUsername(),user.getHostname());
+	display->addNewHost(user.getUsername(),user.getHostname());
 	return 0;
 }
 
@@ -472,7 +491,7 @@ int LP2PM_Client::closingMsgHandler(LP2PM_Packet* packet){
 			<< packet->getUsername() << ") could not be found\n";
 		return -1;
 	}
-	display.removeHost(packet->getUsername(),packet->getHostname());
+	display->removeHost(packet->getUsername(),packet->getHostname());
 	if(users.isEmpty()) current_broadcast_timeout = init_broadcast_timeout;
 	return 0;
 }
@@ -488,7 +507,7 @@ int LP2PM_Client::tcpMsgHandler(LP2PM_Packet* packet, LP2PM_User* user){
 				sprintf(NEW_CONSOLE_LINE,
 						"%s Requests to start Communication with you",
 						user->getUsername());
-				display.addNewConsoleLine(NEW_CONSOLE_LINE);
+				display->addNewConsoleLine(NEW_CONSOLE_LINE);
 			}
 			return establishMsgHandler(packet->getUsername(),
 									   packet->getHostname(),user);
@@ -500,7 +519,7 @@ int LP2PM_Client::tcpMsgHandler(LP2PM_Packet* packet, LP2PM_User* user){
 				sprintf(NEW_CONSOLE_LINE,
 						"%s has Accepted your Communications Request",
 						user->getUsername());
-				display.addNewConsoleLine(NEW_CONSOLE_LINE);
+				display->addNewConsoleLine(NEW_CONSOLE_LINE);
 			}
 			return acceptMsgHandler(user);
 		case LP2PM_TYPE_DECLINE:
@@ -511,7 +530,7 @@ int LP2PM_Client::tcpMsgHandler(LP2PM_Packet* packet, LP2PM_User* user){
 				sprintf(NEW_CONSOLE_LINE,
 						"%s has Declined your Communications Request",
 						user->getUsername());
-				display.addNewConsoleLine(NEW_CONSOLE_LINE);
+				display->addNewConsoleLine(NEW_CONSOLE_LINE);
 			}
 			return userUnavailableMsgHandler(user);
 		case LP2PM_TYPE_DATA:
@@ -522,7 +541,7 @@ int LP2PM_Client::tcpMsgHandler(LP2PM_Packet* packet, LP2PM_User* user){
 				sprintf(NEW_CONSOLE_LINE,
 						"Data packet received from %s",
 						user->getUsername());
-				display.addNewConsoleLine(NEW_CONSOLE_LINE);
+				display->addNewConsoleLine(NEW_CONSOLE_LINE);
 			}
 			return dataMsgHandler(packet,user);
 		case LP2PM_TYPE_MESSAGE:
@@ -533,7 +552,7 @@ int LP2PM_Client::tcpMsgHandler(LP2PM_Packet* packet, LP2PM_User* user){
 				sprintf(NEW_CONSOLE_LINE,
 						"Message packet received from %s",
 						user->getUsername());
-				display.addNewConsoleLine(NEW_CONSOLE_LINE);
+				display->addNewConsoleLine(NEW_CONSOLE_LINE);
 			}
 			return messageMsgHandler(packet,user);
 		case LP2PM_TYPE_DISCONTINUE:
@@ -544,7 +563,7 @@ int LP2PM_Client::tcpMsgHandler(LP2PM_Packet* packet, LP2PM_User* user){
 				sprintf(NEW_CONSOLE_LINE,
 						"%s has Discontinued communications with you",
 						user->getUsername());
-				display.addNewConsoleLine(NEW_CONSOLE_LINE);
+				display->addNewConsoleLine(NEW_CONSOLE_LINE);
 			}
 			return discontinueMsgHandler(user);
 		default:
@@ -599,10 +618,10 @@ int LP2PM_Client::dataMsgHandler(LP2PM_Packet* packet, LP2PM_User* user){
 	if(DEBUG) cout << "LP2PM_Client::dataMsgHandler()" << endl;
 	if(DEBUG){
 		cout << "LP2PM_Client::dataMsgHandler() - Sending \"" 
-				<< packet->getMsg() << "\" to Display...\n";
+				<< packet->getMsg() << "\" to display->..\n";
 	}
 	user->addNewMessage(packet->getMsg());
-	display.addNewMessage(user->getUsername(),user->getHostname(),
+	display->addNewMessage(user->getUsername(),user->getHostname(),
 						  packet->getMsg());
 	return 0;
 }
@@ -611,10 +630,10 @@ int LP2PM_Client::messageMsgHandler(LP2PM_Packet* packet, LP2PM_User* user){
 	if(DEBUG) cout << "LP2PM_Client::messageMsgHandler()" << endl;
 	if(DEBUG){
 		cout << "LP2PM_Client::messageMsgHandler() - Sending \""
-		<< packet->getMsg() << "\" to Display...\n";
+		<< packet->getMsg() << "\" to display->..\n";
 	}
 	user->addNewMessage(packet->getMsg());
-	display.addNewMessage(user->getUsername(),user->getHostname(),
+	display->addNewMessage(user->getUsername(),user->getHostname(),
 						  packet->getMsg());
 	return 0;
 }
@@ -646,7 +665,7 @@ int LP2PM_Client::broadcastDiscoveryMsg(){
 		sprintf(NEW_CONSOLE_LINE,
 				"LP2PM_Client::broadcastDiscoveryMsg() - Broadcasted %d Bytes",
 				r);
-		display.addNewConsoleLine(NEW_CONSOLE_LINE);
+		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
 	return r;
 }
@@ -667,7 +686,7 @@ int LP2PM_Client::broadcastClosingMsg(){
 		sprintf(NEW_CONSOLE_LINE,
 				"LP2PM_Client::broadcastClosingMsg() - Broadcasted %d Bytes",
 				r);
-		display.addNewConsoleLine(NEW_CONSOLE_LINE);
+		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
 	return r;
 }
@@ -692,7 +711,7 @@ int LP2PM_Client::sendReplyMsg(LP2PM_User* user){
 		sprintf(NEW_CONSOLE_LINE,
 				"LP2PM_Client::sendReplyMsg() - Sent %d Bytes",
 				r);
-		display.addNewConsoleLine(NEW_CONSOLE_LINE);
+		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
 	return r;
 }
@@ -717,7 +736,7 @@ int LP2PM_Client::sendRequestComMsg(LP2PM_User* user){
 		sprintf(NEW_CONSOLE_LINE,
 				"LP2PM_Client::sendRequestComMsg() - Sent %d Bytes to %s@%s",
 				r,user->getUsername(),user->getHostname());
-		display.addNewConsoleLine(NEW_CONSOLE_LINE);
+		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
 	if(r < 0){
 		if(DEBUG){
@@ -749,7 +768,7 @@ int LP2PM_Client::sendAcceptComMsg(LP2PM_User* user){
 		sprintf(NEW_CONSOLE_LINE,
 				"LP2PM_Client::sendAcceptComMsg() - Sent %d Bytes to %s@%s",
 				r,user->getUsername(),user->getHostname());
-		display.addNewConsoleLine(NEW_CONSOLE_LINE);
+		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
 	if(r < 0){
 		if(DEBUG){
@@ -781,7 +800,7 @@ int LP2PM_Client::sendDeclineMsg(LP2PM_User* user){
 		sprintf(NEW_CONSOLE_LINE,
 				"LP2PM_Client::sendDeclineMsg() - Sent %d Bytes to %s@%s",
 				r,user->getUsername(),user->getHostname());
-		display.addNewConsoleLine(NEW_CONSOLE_LINE);
+		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
 	if(r < 0){
 		if(DEBUG){
@@ -813,7 +832,7 @@ int LP2PM_Client::sendDataMsg(LP2PM_User* user, char* msg){
 		sprintf(NEW_CONSOLE_LINE,
 				"LP2PM_Client::sendDataMsg() - Sent %d Bytes to %s@%s",
 				r,user->getUsername(),user->getHostname());
-		display.addNewConsoleLine(NEW_CONSOLE_LINE);
+		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
 	if(r < 0){
 		if(DEBUG){
@@ -845,7 +864,7 @@ int LP2PM_Client::sendMessage(LP2PM_User* user, char* msg){
 		sprintf(NEW_CONSOLE_LINE,
 				"LP2PM_Client::sendMessage() - Sent %d Bytes to %s@%s",
 				r,user->getUsername(),user->getHostname());
-		display.addNewConsoleLine(NEW_CONSOLE_LINE);
+		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
 	if(r < 0){
 		if(DEBUG){
@@ -877,7 +896,7 @@ int LP2PM_Client::sendDiscontinueComMsg(LP2PM_User* user){
 		sprintf(NEW_CONSOLE_LINE,
 				"LP2PM_Client::sendDiscontinueComMsg() - Sent %d Bytes to %s@%s",
 				r,user->getUsername(),user->getHostname());
-		display.addNewConsoleLine(NEW_CONSOLE_LINE);
+		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
 	if(r < 0){
 		if(DEBUG){
