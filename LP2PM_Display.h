@@ -1,29 +1,14 @@
 #include <panel.h>
 #include <cstring>
+#include <string>
 #include <ctype.h>
 #include <string>
 #include <iostream>
+#include <algorithm>
 #include "LP2PM_Hostlist.h"
 #include "LP2PM_Macros.h"
 
-// TODO:
-// parse all the different things that can go into the TO: field
-
 /*
- * Window 0: Available Hosts to connect to with User List
- * Window 1: Message Window 
- 	- can send an establish message to user
- 		- "establish@user1@host"
- 	- can send a message to a single user
- 		- "user1@host"
- 	- can send to all users (who are established)
- 		- "all"
- 	- can send a disconnect message to user
- 		- "disconnect@user1@host"
- 	- can send a disconnect message to all users
- 		- "disconnect@all"
-	- request user list
-		- "requestuserlist@user@host"
  * compile: -lpanel -lncurses
  *
  */
@@ -34,36 +19,37 @@ static char NEW_CONSOLE_LINE[MAX_CONSOLE_CHARS];
 
 class LP2PM_Display{
 private:
-	char		hostname[MAX_HOSTNAME_LENGTH];
-	char		username[MAX_USERNAME_LENGTH];
-	char		toArguments[MAX_TO_LINE_ARGUS][MAX_TO_LINE_LEN];
-	short		nToArgus;
-	HostList	hostList;
-	char		msg_history[MAX_MSGS_LINES][MAX_MSGS_CHARS];
-	char		clear_msg_line[MAX_MSGS_CHARS];
-	char		console_history[MAX_CONSOLE_LINES][MAX_CONSOLE_CHARS];
-	char		clear_console_line[MAX_CONSOLE_CHARS];
-	int			to_i;
-	int			msg_i;
-	string		to_line;
-	string		msg_line;
-	WINDOW*		header_window;
-	WINDOW*		hosts_window;
-	WINDOW*		messages_window;
-	WINDOW*		to_window;
-	WINDOW*		msg_window;
-	WINDOW*		console_window;
-	PANEL*		header_panel;
-	PANEL*		hosts_panel;
-	PANEL*		messages_panel;
-	PANEL*		to_window_panel;
-	PANEL*		msg_window_panel;
-	PANEL*		console_panel;
+	static LP2PM_Display*	LP2PM_Display_Instance;
+	char					hostname[MAX_HOSTNAME_LENGTH];
+	char					username[MAX_USERNAME_LENGTH];
+	char					toArguments[MAX_TO_LINE_ARGUS][MAX_TO_LINE_LEN];
+	short					nToArgus;
+	HostList				hostList;
+	char					msg_history[MAX_MSGS_LINES][MAX_MSGS_CHARS];
+	char					clear_msg_line[MAX_MSGS_CHARS];
+	char					console_history[MAX_CONSOLE_LINES][MAX_CONSOLE_CHARS];
+	char					clear_console_line[MAX_CONSOLE_CHARS];
+	int						to_i;
+	int						msg_i;
+	string					to_line;
+	string					msg_line;
+	WINDOW*					header_window;
+	WINDOW*					hosts_window;
+	WINDOW*					messages_window;
+	WINDOW*					to_window;
+	WINDOW*					msg_window;
+	WINDOW*					console_window;
+	PANEL*					header_panel;
+	PANEL*					hosts_panel;
+	PANEL*					messages_panel;
+	PANEL*					to_window_panel;
+	PANEL*					msg_window_panel;
+	PANEL*					console_panel;
 
-	PANEL*		top;
+	PANEL*					top;
 
-	void printInMiddle(WINDOW *win, int starty, int startx, int width,
-					   char *string, chtype color);
+	void printInMiddle( WINDOW *win, int starty, int startx, int width,
+					   char *string, chtype color );
 	
 /* ---- Window Initalizers ---- */
 	/*
@@ -137,7 +123,7 @@ private:
 	 *
 	 *	@param	const char*		line to add to end of message history
 	 */
-	void insertMsgLine(const char*);
+	void insertMsgLine( const char* );
 	
 	/*
 	 *	Given a new message (with username and host combo included)
@@ -145,7 +131,7 @@ private:
 	 *
 	 *	@param	const char*		New Message to add
 	 */
-	void addNewLine(const char*);
+	void addNewLine( const char* );
 	
 	/*
 	 *	Parses the arguments entered in the To window/line
@@ -159,8 +145,9 @@ private:
 	 *	@param1	const char*		[user]@[host] cstring
 	 *	@param2	char*			user buffer
 	 *	@param3	char*			host buffer
+	 *	@return	int				0 on success, -1 on fail/error
 	 */
-	void parseUserHost(const char*);
+	int parseUserHost( const char* );
 	
 	/*
 	 *	Called when the [backspace]/[delete] key is pressed
@@ -172,22 +159,36 @@ private:
 	 *
 	 *	@param	char		key pressed
 	 */
-	void addCharacter(char);
+	void addCharacter( char );
 	
 	/*
 	 *	Convert cstring to Uppercase
 	 *	@param1	char*		cstring
 	 */
-	void toUpperCase(char*);
+	std::string toUpperCase( char* );
 	/*
 	 *	@param1	char*		cstring
 	 *	@param2	int			# of chars to convert to uppercase
 	 */
-	void toUpperCase(char*, int);
+	std::string toUpperCase( char*, int );
 	
-public:
+	/*
+	 *	Private for singleton purposes
+	 */
 	LP2PM_Display();
 	~LP2PM_Display();
+	
+public:
+	
+	/*
+	 *	Create or get LP2PM_Display instance
+	 */
+	static LP2PM_Display* Instance();
+	
+	/*
+	 *	Destroy LP2PM_Display instance
+	 */
+	static void Destroy();
 	
 	/*
 	 *	Initializes the LP2PM_Display
@@ -196,7 +197,7 @@ public:
 	 *	@param1	const char*		username
 	 *	@param2	const char*		hostname
 	 */
-	void init(				const char*, const char*);
+	void init( const char*, const char* );
 	
 	/*
 	 *	Set the User's username (is displayed in the user interface)
@@ -204,14 +205,14 @@ public:
 	 *	@param	const char*		username
 	 */
 
-	void setUsername(		const char*);
+	void setUsername( const char* );
 	
 	/*
 	 *	Set the User's hostname (is displayed in the user interface)
 	 *
 	 *	@param	const char*		hostname
 	 */
-	void setHostname(		const char*);
+	void setHostname( const char* );
 	
 	/*
 	 *	Change the User's status
@@ -220,7 +221,7 @@ public:
 	 *	@param2	const char*		hostname
 	 *	@param3	int				new status
 	 */
-	void changeUserStatus(	const char*, const char*, int);
+	void changeUserStatus( const char*, const char*, int );
 	
 	/*
 	 *	Add a new Host to the Host window & list
@@ -228,7 +229,7 @@ public:
 	 *	@param1	const char*		host's username
 	 *	@param2 const char*		host's hostname
 	 */
-	void addNewHost(		const char*, const char*);
+	void addNewHost( const char*, const char* );
 	
 	/*
 	 *	Remove a Host from the Host window & list
@@ -236,7 +237,7 @@ public:
 	 *	@param1	const char*		host's username
 	 *	@param2 const char*		host's hostname
 	 */
-	void removeHost(		const char*, const char*);
+	void removeHost( const char*, const char* );
 	
 	/*
 	 *	Add a new message from a user to the Message Window
@@ -245,14 +246,14 @@ public:
 	 *	@param2	const char*		message sender's hostname
 	 *	@param3	const char*		message
 	 */
-	void addNewMessage(		const char*, const char*, const char*);
+	void addNewMessage( const char*, const char*, const char* );
 	
 	/*
 	 *	Add a new console message the the Console Window
 	 *
 	 *	@param1	const char*		new message/line to be added to console window
 	 */
-	void addNewConsoleLine(	const char*);
+	void addNewConsoleLine(	const char* );
 	
 	/*
 	 *	Adds a new message from the current user to another user
@@ -260,7 +261,7 @@ public:
 	 *	@param1	const char*		username of recipient
 	 *	@param2	const char*		message
 	 */
-	void addNewUserMsg(		const char*, const char* );
+	void addNewUserMsg( const char*, const char* );
 	
 	/*
 	 *	This is usually called from outside this class
@@ -268,21 +269,23 @@ public:
 	 *
 	 *	@param	char			keyboard input
 	 */
-	void updateDisplay(		char);
+	void updateDisplay( char );
 	
 	/*
 	 *	Store the To line and parses the arguments
 	 *
 	 *	@param1	char*		destination username
 	 *	@param2	char*		destination hostname
-	 *	@return	int			type of argument submitted
-	 *						Type 1: 
-	 *						Type 2:
-	 *						Type 3:
-	 *						Type 4:
-	 *						Type 5:
+	 *	@return	int			type of argument submitted:
+	 *						Type 0: Message
+	 *						Type 1: Request
+	 *						Type 2:	Accept
+	 *						Type 3:	Decline
+	 *						Type 4:	Discontinue
+	 *						Type 5:	Away (status change)
+	 *						Type 6:	Here (status change)
 	 */
-	int	 getToLine(			char*,char*); // FIXIT
+	int	 getToLine( char*, char* ); // FIXIT
 	
 	/*
 	 *	Store the Message line in given buffer
@@ -290,7 +293,7 @@ public:
 	 *	@param1	char*		buffer
 	 *	@param2	int			size of @param1 buffer
 	 */
-	void getMsgLine(		char*,int);
+	void getMsgLine( char*, int );
 	
 	/*
 	 *	Clears the To and Message Line windows 

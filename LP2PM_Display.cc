@@ -1,15 +1,22 @@
 #include "LP2PM_Display.h"
 
-// TODO
-//	[ ] Should be a singleton
+LP2PM_Display* LP2PM_Display::Instance()
+{	if(!LP2PM_Display_Instance) LP2PM_Display_Instance = new LP2PM_display();
+	return LP2PM_Display_Instance;
+}
+
+void LP2PM_Display::Destroy()
+{	if(LP2PM_Display_Instance)
+	{	delete LP2PM_Display_Instance;
+		LP2PM_Display_Instance = NULL;
+	}
+}
 
 LP2PM_Display::LP2PM_Display():
 to_i(0),msg_i(0),nToArgus(0)
 {	if(DEBUG) cout << "LP2PM_Display::LP2PM_Display()" << endl;
 	bzero(hostname,MAX_HOSTNAME_LENGTH);
 	bzero(username,MAX_USERNAME_LENGTH);
-	//memset(hostname,0,MAX_HOSTNAME_LENGTH);
-	//memset(username,0,MAX_USERNAME_LENGTH);
 	
 	to_line = "";
 	msg_line = "";
@@ -17,22 +24,20 @@ to_i(0),msg_i(0),nToArgus(0)
 	/* Init Message History */
 	for(int i = 0; i < MAX_MSGS_LINES; ++i)
 		bzero(msg_history[i],MAX_MSGS_CHARS);
-		//memset(msg_history[i],0,MAX_MSGS_CHARS);
+
 	/* Init Console History */
 	for(int i = 0; i < MAX_CONSOLE_LINES; ++i)
 		bzero(console_history[i],MAX_CONSOLE_CHARS);
-		//memset(console_history[i],0,MAX_CONSOLE_CHARS);
+
 	/* Init To Line */
 	for(int i = 0; i < MAX_TO_LINE_ARGUS; ++i)
 		bzero(toArguments[i],MAX_TO_LINE_LEN);
-		//memset(toArguments[i],0,MAX_TO_LINE_LEN);
 	
 	memset(clear_msg_line,' ',MAX_MSGS_CHARS);
 	clear_msg_line[MAX_MSGS_CHARS-1] = '\0';
 	
 	memset(clear_console_line,' ',MAX_CONSOLE_CHARS);
 	clear_console_line[MAX_CONSOLE_CHARS-1] = '\0';
-	if(DEBUG) cout << "LP2PM_Display::LP2PM_Display() - end" << endl;
 }
 
 LP2PM_Display::~LP2PM_Display()
@@ -99,15 +104,11 @@ void LP2PM_Display::printInMiddle(WINDOW *win, int starty, int startx,
 {	int length, x, y;
 	float temp;
 	
-	if(win == NULL)
-		win = stdscr;
+	if(win == NULL) win = stdscr;
 	getyx(win, y, x);
-	if(startx != 0)
-		x = startx;
-	if(starty != 0)
-		y = starty;
-	if(width == 0)
-		width = 80;
+	if(startx != 0) x = startx;
+	if(starty != 0) y = starty;
+	if(width == 0)  width = 80;
 	
 	length = strlen(string);
 	temp = (width - length)/ 2;
@@ -309,9 +310,7 @@ void LP2PM_Display::clearHostDisplay()
  */
 void LP2PM_Display::insertMsgLine(const char* msg)
 {	moveMsgsUp();
-	if(strlen(msg) > MAX_MSGS_CHARS)
-		snprintf(msg_history[MAX_MSGS_LINES-1],MAX_MSGS_CHARS,"%s",msg);
-	else sprintf(msg_history[MAX_MSGS_LINES-1],"%s",msg);
+	strncpy(msg_history[MAX_MSGS_LINES-1],min(MAX_MSGS_CHARS,strlen(msg)),msg);
 }
 
 /*
@@ -353,8 +352,8 @@ void LP2PM_Display::parseToLineArguments()
 	nToArgus = k+1;
 }
 
-void LP2PM_Display::parseUserHost(const char* cstring, char* user, char* host)
-{	if(!strchr(cstring,'@')) strcpy(user,cstring);
+int LP2PM_Display::parseUserHost(const char* cstring, char* user, char* host)
+{	if(!strchr(cstring,'@')){ strcpy(user,cstring); return -1; }
 	string s = "";
 	int i = 0;
 	for(; cstring[i]; ++i){
@@ -362,6 +361,7 @@ void LP2PM_Display::parseUserHost(const char* cstring, char* user, char* host)
 		else s+=cstring[i];
 	}
 	if(cstring[i] && cstring[i+1]) strcpy(host,cstring+i+1);
+	return 0;
 }
 
 /*
@@ -398,11 +398,17 @@ void LP2PM_Display::addCharacter(char ch)
 	}
 }
 
-void LP2PM_Display::toUpperCase(char* cstring)
-{	for(int i = 0; cstring[i]; ++i) cstring[i] = toupper(cstring[i]); }
+std::string LP2PM_Display::toUpperCase(char* cstring)
+{	std::string caps = "";
+	for(int i = 0; cstring[i]; ++i) caps += toupper(cstring[i]);
+	return caps;
+}
 
-void LP2PM_Display::toUpperCase(char* cstring, int n)
-{	for(int i = 0; i < n; ++i) cstring[i] = toupper(cstring[i]); }
+std::string LP2PM_Display::toUpperCase(char* cstring, int n)
+{	std::string caps = "";
+	for(int i = 0; i < n && cstring[i]; ++i) caps += toupper(cstring[i]);
+	return caps;
+}
 
 void LP2PM_Display::setHostname(const char* h) { strcpy(hostname,h); }
 
@@ -440,9 +446,8 @@ void LP2PM_Display::addNewMessage(const char* user, const char* host,
 
 void LP2PM_Display::addNewConsoleLine(const char* newLine)
 {	moveConsoleUp();
-	if(strlen(newLine) > MAX_CONSOLE_CHARS)
-		strncpy(console_history[MAX_CONSOLE_LINES-1],newLine,MAX_CONSOLE_CHARS);
-	else strcpy(console_history[MAX_CONSOLE_LINES-1],newLine);
+	strncpy(msg_history[MAX_CONSOLE_LINES-1],
+			min(MAX_CONSOLE_LINES,strlen(newLine)),newLine);
 	
 	console_history[MAX_CONSOLE_LINES-1][strlen(newLine)] = ' ';
 	console_history[MAX_CONSOLE_LINES-1][MAX_CONSOLE_CHARS-1] = '\0';
@@ -481,41 +486,37 @@ void LP2PM_Display::updateDisplay(char ch)
 	doupdate();
 }
 
-// 0 - single user
-// 1 - establish
-// 2 - disconnect
-// 3 - all
-// 4 - request list
-// 5 - change user availiablity status
+// 0 - message to user
+// 1 - request communications to user
+// 2 - accept communications from user
+// 3 - decline communications from user
+// 4 - discontinue communications with user
+// 5 - change status to 'away'
+// 6 - change status to 'here'
 int LP2PM_Display::getToLine(char* dest_user, char* dest_host)
 {	parseToLineArguments();
-	toUpperCase(toArguments[0]);
-	char* to_command = toArguments[0];
-	if(!strcmp(to_command,(char*)REQUEST_COMMAND)){
-		strcpy(dest_user,toArguments[1]);
-		strcpy(dest_host,toArguments[2]);
-		return 1;
+	if(nToArgus < 1 || nToArgus > 2){
+		dest_user[0] = dest_host[0] = '\0';
+		return -1;
 	}
-	if(!strcmp(to_command,(char*)ACCEPT_COMMAND)){
-		
+	std::string toArg = toUpperCase(toArguments[0]);
+	const char* toArg_c = toArg.c_str();
+	
+	if(nToArgus == 1){
+		if(!strcmp(toArg_c,(char*)AWAY_COMMAND))	return TO_TYPE_AWAY;
+		if(!strcmp(toArg_c,(char*)HERE_COMMAND))	return TO_TYPE_HERE;
+		if(parseUserHost(toArguments[0],dest_user,dest_host) < 0) return -1;
+		return TO_TYPE_MESSAGE;
 	}
-	if(!strcmp(to_command,(char*)DECLINE_COMMAND)){
-		
-	}
-	if(!strcmp(to_command,(char*)DISCONTINUE_COMMAND)){
-		strcpy(dest_user,toArguments[1]);
-		return 2;
-	}
-	if(!strcmp(to_command,(char*)AWAY_COMMAND)){
-		
-	}
-	if(!strcmp(to_command,(char*)HERE_COMMAND)){
-		
-	}
-
-	strcpy(dest_user,toArguments[0]);
-	strcpy(dest_host,toArguments[1]);
-	return 0;
+	
+	if(parseUserHost(toArguments[1],dest_user,dest_host) < 0) return -1;
+	
+	if(!strcmp(toArg_c,(char*)REQUEST_COMMAND))		return TO_TYPE_REQUEST;
+	if(!strcmp(toArg_c,(char*)ACCEPT_COMMAND))		return TO_TYPE_ACCEPT;
+	if(!strcmp(toArg_c,(char*)DECLINE_COMMAND))		return TO_TYPE_DECLINE;
+	if(!strcmp(toArg_c,(char*)DISCONTINUE_COMMAND)) return TO_TYPE_DISCONTINUE;
+	
+	return -1;
 }
 
 void LP2PM_Display::getMsgLine(char* buffer, int size)
