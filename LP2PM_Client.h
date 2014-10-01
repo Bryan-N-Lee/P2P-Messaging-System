@@ -11,7 +11,7 @@
 class LP2PM_Client{
 private:
 	UserList			users;
-	LP2PM_Display		display;
+	LP2PM_Display*		display;
 	char				hostname[MAX_HOSTNAME_LENGTH];
 	char				username[MAX_USERNAME_LENGTH];
 	char				ip_addr[INET_ADDRSTRLEN];
@@ -87,6 +87,11 @@ public:
 	 *	Initialize Client by establishing UDP and TCP protocols
 	 */
 	int init();
+	
+	/*
+	 *	Start client
+	 */
+	int start();
 	
 	/*
 	 * 1.  On Start send Broadcast Msg
