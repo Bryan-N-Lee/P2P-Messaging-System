@@ -2,6 +2,15 @@
 
 UserList::UserList():
 head(NULL),size(0){}
+
+std::string LP2PM_Userlist::toUpperCase(char* cstring)
+{	std::string caps = "";
+	for(int i = 0; cstring[i]; ++i) caps += toupper(cstring[i]);
+	return caps;
+}
+
+bool LP2PM_Userlist::compareUserHost(const char* c1, const char* c2)
+{	return toUppercase(c1) == toUppercase(c2); }
 	
 bool UserList::isEmpty(){ return !head; }
 	
@@ -47,9 +56,8 @@ void UserList::pop(){
 
 LP2PM_User* UserList::retrieve(const char* username, const char* hostname){
 	for(UserNode* p = head; p; p = p->next){
-		if(strcmp(username,p->user.getUsername()) == 0 &&
-		   strcmp(hostname,p->user.getHostname()) == 0)
-			return &(p->user);
+		if(compareUserHost(username,p->user.getUsername()) &&
+		   compareUserHost(hostname,p->user.getHostname())) return &(p->user);
 	}
 	return NULL;
 }

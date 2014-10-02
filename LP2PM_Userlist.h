@@ -1,5 +1,6 @@
 #include "LP2PM_User.h"
 #include "LP2PM_Macros.h"
+#include <string>
 
 struct UserNode{
 	LP2PM_User user;
@@ -12,6 +13,9 @@ class UserList{
 private:
 	UserNode* head;
 	int size;
+	std::string toUppercase(const char*);
+	bool compareUserHost(const char*, const char*);
+	
 public:
 	UserList();
 	~UserList();
