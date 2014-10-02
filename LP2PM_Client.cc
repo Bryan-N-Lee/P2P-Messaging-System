@@ -1,5 +1,10 @@
 #include "LP2PM_client.h"
 
+// TODO:
+// [ ] FIX TCP connection problems, discoveryMsgHandler & replyMsgHandler
+// [ ] keyboardReceived()
+// [ ] listenforAction()
+
 using namespace std;
 
 LP2PM_Client::LP2PM_Client(const char* username, int init, int max, int udp,
@@ -46,6 +51,7 @@ int LP2PM_Client::start(){
 	closeClient();
 	//endwin();
 	LP2PM_Display::Destroy();
+	display = NULL;
 }
 
 bool LP2PM_Client::checkSockaddr(sockaddr_in const &a, sockaddr_in const &b){ return a.sin_addr.s_addr == b.sin_addr.s_addr; }
@@ -131,6 +137,11 @@ int LP2PM_Client::establishTCPserver(){
 	return 0;
 }
 
+void LP2PM_Client::changeStatus(int new_status){
+	user_availability_status = new_status;
+	// ADD CONSOLE MESSAGE
+}
+
 int P2PIM_Client::listenForAction(){
 	if(DEBUG) cout << "P2PIM_Client::listenForAction()" << endl;
 	
@@ -190,11 +201,11 @@ int P2PIM_Client::listenForAction(){
 			default:{ /* ---- Event Occurred ---- */
 				if(ufds[0].revents & POLLIN){ // UDP Message Received
 					if(DEBUG) cout << "P2PIM_Client::listenForAction() - UDP Event Received\n";
-					udpMessageReceived();
+					UDPMessageReceived();
 				}
 				else if(ufds[1].revents & POLLIN){ // TCP Message Received
 					if(DEBUG) cout << "P2PIM_Client::listenForAction() - TCP Event Received\n";
-					tcpMessageReceived();
+					TCPMessageReceived();
 				}
 				else if(ufds[2].revents & POLLIN){ // Keyboard input received
 					if(DEBUG) cout << "P2PIM_Client::listenForAction() - Keyboard Event Received\n";
@@ -216,13 +227,13 @@ int P2PIM_Client::listenForAction(){
 							u->incoming_packet.clearPacket();
 							result = read(u->TCP_socket,
 										  u->incoming_packet.getData(0),
-										  P2PIM_DEFAULT_MAX_PACKET_SIZE-1);
+										  P2PIM_DEFAULT_MAX_PACKET_SIZE);
 							if(result < 0){
 								cerr << "[Error] P2PIM_Client::listenForAction() "
 								<<"- TCP read returned error" << endl;
 								break;
 							}
-							tcpMsgHandler(&(u->incoming_packet),u);
+							TCPHandler(&(u->incoming_packet),u);
 							break;
 						}
 					}
@@ -240,7 +251,7 @@ int P2PIM_Client::listenForAction(){
  *	Reads and stores the incoming UDP packet
  */
 void LP2PM_Client::UDPMessageReceived(){
-	if(DEBUG) cout << "P2PIM_Client::udpMessageReceived()" << endl;
+	if(DEBUG) cout << "P2PIM_Client::UDPMessageReceived()" << endl;
 	int result = 0;
 	struct sockaddr_in user_addr;
 	socklen_t userLn = sizeof(user_addr);
@@ -249,7 +260,7 @@ void LP2PM_Client::UDPMessageReceived(){
 					  P2PIM_DEFAULT_MAX_PACKET_SIZE, 0,
 					  (struct sockaddr*)&user_addr, &userLn);
 	if(result < 0){
-		cout << "[Error] P2PIM_Client::udpMessageReceived() "
+		cout << "[Error] P2PIM_Client::UDPMessageReceived() "
 		<<"- UDP Recvfrom returned error" << endl;
 		return;
 	}
@@ -257,7 +268,7 @@ void LP2PM_Client::UDPMessageReceived(){
 	if(UDP_in_packet.isDisM() || UDP_in_packet.isCM()){
 		if(hostIsMe(UDP_in_packet.getUsername(),UDP_in_packet.getHostname())){
 			if(DEBUG){
-				cout << "P2PIM_Client::udpMessageReceived() - "
+				cout << "P2PIM_Client::UDPMessageReceived() - "
 				<< "Received own broadcast ("
 				<< UDP_in_packet.getUsername() << "@"
 				<< UDP_in_packet.getHostname() << ")\n";
@@ -266,13 +277,13 @@ void LP2PM_Client::UDPMessageReceived(){
 		}
 	}
 	if(DEBUG) {
-		cout << "P2PIM_Client::udpMessageReceived() - UDP Received "
-		<< result << " Bytes from "
-		<< inet_ntoa(user_addr.sin_addr) << endl;
-		cout << "P2PIM_Client::udpMessageReceived() - UDP Message Type: "
-		<< UDP_in_packet.getType() << " - PID: "
-		<< UDP_in_packet.getPID() << endl;
-		cout << "P2PIM_Client::udpMessageReceived() - ";
+		cout << "P2PIM_Client::UDPMessageReceived() - UDP Received "
+			<< result << " Bytes from "
+			<< inet_ntoa(user_addr.sin_addr) << endl;
+		cout << "P2PIM_Client::UDPMessageReceived() - UDP Message Type: "
+			<< UDP_in_packet.getType() << " - PID: "
+			<< UDP_in_packet.getPID() << endl;
+		cout << "P2PIM_Client::UDPMessageReceived() - ";
 		UDP_in_packet.printPacket();
 		cout << endl;
 	}
@@ -283,7 +294,7 @@ void LP2PM_Client::UDPMessageReceived(){
 		cout << "MOVING: " << display->NEW_CONSOLE_LINE << endl;
 		display->addNewConsoleLine();
 	}
-	udpMsgHandler(&UDP_in_packet);
+	UDPHandler(&UDP_in_packet);
 }
 
 /*
@@ -292,8 +303,7 @@ void LP2PM_Client::UDPMessageReceived(){
  */
 void LP2PM_Client::TCPMessageReceived(){
 	if(DEBUG){
-		cout << "P2PIM_Client::tcpMessageReceived()" << endl;
-		cout << "P2PIM_Client::tcpMessageReceived() - ";
+		cout << "P2PIM_Client::TCPMessageReceived() - ";
 		TCP_in_packet.printPacket();
 		cout << endl;
 	}
@@ -304,25 +314,25 @@ void LP2PM_Client::TCPMessageReceived(){
 	P2PIM_User user;
 	user.TCP_socket = accept(TCP_socket,(struct sockaddr*)&TCP_addr, &clientLn);
 	if(user.TCP_socket < 0){
-		cerr << "[Error] P2PIM_Client::listenForAction() "
-		<<"- TCP Accept returned error" << endl;
+		cerr << "[Error] P2PIM_Client::TCPMessageReceived() "
+			<<"- TCP Accept returned error" << endl;
 		return;
 	}
 	
 	result = read(user.TCP_socket,user.incoming_packet.getData(0),
 				  P2PIM_DEFAULT_MAX_PACKET_SIZE);
 	if(result < 0){
-		cerr << "[Error] P2PIM_Client::listenForAction() "
-		<<"- TCP read returned error" << endl;
+		cerr << "[Error] P2PIM_Client::TCPMessageReceived() "
+			<<"- TCP read returned error" << endl;
 		return;
 	}
 	user.incoming_packet.setSize(result);
 	if(DEBUG){
-		cout << "P2PIM_Client::listenForAction() - TCP Message Type: "
-		<< user.incoming_packet.getType() << " - PID: "
-		<< user.incoming_packet.getPID() << endl;
+		cout << "P2PIM_Client::TCPMessageReceived() - TCP Message Type: "
+			<< user.incoming_packet.getType() << " - PID: "
+			<< user.incoming_packet.getPID() << endl;
 	}
-	tcpMsgHandler(&TCP_in_packet,users.findUser(TCP_addr));
+	TCPHandler(&TCP_in_packet,users.findUser(TCP_addr));
 }
 
 int LP2PM_Client::keyboardReceived(){
@@ -330,119 +340,94 @@ int LP2PM_Client::keyboardReceived(){
 	char RXChar;
 	if(read(STDIN_FILENO, &RXChar, 1) > 0){
 		if(DEBUG){
-			cout << "P2PIM_Client::listenForAction() -"
-			<< " STDIN Event Received: \'" << RXChar << "\'\n";
+			cout << "P2PIM_Client::keyboardReceived() -"
+				<< " STDIN Event Received: \'" << RXChar << "\'\n";
 		}
 		switch(RXChar){
 			case KEY_F(1): // F1
 				return 1;
-			case 10:
-			case 0x0D:{ // return
+			case 0x0D:
+			case 10:{ // return
 				if(DEBUG){
-					cout << "P2PIM_Client::listenForAction() -"
-					<< " Return - Retrieving info\n";
+					cout << "P2PIM_Client::keyboardReceived() -"
+						<< " Return - Retrieving info\n";
 				}
-				char dest_user[MAX_TO_LINE_LEN];
-				char dest_host[MAX_TO_LINE_LEN];
+				char dest_user[MAX_USERNAME_LENGTH];
+				char dest_host[MAX_HOSTNAME_LENGTH];
 				char dest_msg[MAX_MSG_LENGTH];
+				
 				int toType = display->getToLine(dest_user,dest_host);
 				display->getMsgLine(dest_msg,MAX_MSG_LENGTH);
 				display->updateDisplay(RXChar);
-				if(toType < 0){
-					if(DEBUG) cout << "P2PIM_Client::listenForAction() - Unknown Command\n";
-					return 0;
-				}
-				if(toType == 3){	// All
-					for(int i = 0; i < users.getSize(); ++i){
-						P2PIM_User* temp = users.getUser(i);
-						handleSendingDataMsg(temp,dest_msg);
-						display->addNewMessage(username,
-											  temp->getUsername(),
-											  dest_msg);
-					}
-					return 0;
-				}
-				else if(toType == 5){ // change status
-					if(DEBUG){
-						cout << "P2PIM_Client::listenForAction() -"
-						<< " Status Change\n";
-					}
-					user_availability_status *= -1;
-					if(CONSOLE_DEBUG){
-						if(user_availability_status > 0)
-							sprintf(display->NEW_CONSOLE_LINE,
-									"User Status changed to Available");
-						else if(user_availability_status < 0)
-							sprintf(display->NEW_CONSOLE_LINE,
-									"User Status changed to Unavailable");
-						display->addNewConsoleLine();
-					}
-					return 0;
-				}
 				P2PIM_User* u = users.retrieve(dest_user,dest_host);
-				if(!u){
-					if(CONSOLE_DEBUG){
-						sprintf(display->NEW_CONSOLE_LINE,
-								"[Error] Could not find %s@%s",
-								dest_user,dest_host);
-						display->addNewConsoleLine();
-					}
-					if(DEBUG){
-						cout << "[Error] P2PIM_Client::"
-						<< "listenForAction() - Could not find "
-						<< dest_user << "@" << dest_host << endl;
-					}
-					return 0;
-				}
+				
 				switch(toType){
-					case 0:
-						handleSendingDataMsg(u,dest_msg);
-						display->addNewMessage(username,dest_user,
-											  dest_msg);
+					case -1:
+						if(DEBUG) cout << "P2PIM_Client::keyboardReceived() - Unknown Command\n";
+						return 0;
+					case TO_TYPE_AWAY:
+					case TO_TYPE_HERE:
+						changeStatus(toType);
+						/*sprintf(display->NEW_CONSOLE_LINE,
+								"User Status changed to Available");
+						display->addNewConsoleLine();*/
 						break;
-					case 1:
-						sendEstablishEncryptComMsg(u);
-						//sendEstablishComMsg(u);
+					case TO_TYPE_MESSAGE:
+						if(!u) {}// BAD USER INPUT
+						sendMessage(u, dest_msg);
+						display->addNewMessage(username, dest_user, dest_msg);
 						break;
-					case 2:
-						sendDiscontinueComMsg(u);
+					case TO_TYPE_REQUEST:
+						sendRequestComMsg(u);
+						// ADD CONSOLE MESSAGE
+						break;
+					case TO_TYPE_ACCEPT:
+						sendAcceptComMsg(u);
+						// ADD CONSOLE MESSAGE
+						break;
+					case TO_TYPE_DECLINE:
+						sendDeclineMsg(u);
+						// ADD CONSOLE MESSAGE
+						break;
+					case TO_TYPE_DISCONTINUE:
+						sendDicontinueComMsg(u);
 						u->userDisconnected();
+						// ADD CONSOLE MESSAGE
 						break;
-					case 4:
-						sendRequestUserListMsg(u);
-						break;
+					default:
+						// IDK what happened
+						return 0;
 				}
 				break;
 			}
-			default:
-				// print character to screen
+			default: // print character to screen
 				display->updateDisplay(RXChar);
 		}
 	}
 	return 0;
-} // TODO (FIX / SLIM) after getToLine is fixed
+}
 
 
-int LP2PM_Client::udpMsgHandler(LP2PM_Packet* packet){
-	if(DEBUG) cout << "LP2PM_Client::udpMsgHandler()" << endl;
+int LP2PM_Client::UDPHandler(LP2PM_Packet* packet){
+	if(DEBUG) cout << "LP2PM_Client::UDPHandler()" << endl;
 	switch(packet->getType()){
 		case LP2PM_TYPE_DISCOVERY:
 			if(DEBUG){
-				cout << "LP2PM_Client::udpMsgHandler() - Discovery Packet\n";
+				cout << "LP2PM_Client::UDPHandler() - Discovery Packet\n";
 			}
 			return discoveryMsgHandler(packet);
 		case LP2PM_TYPE_REPLY:
 			if(DEBUG){
-				cout << "LP2PM_Client::udpMsgHandler() - Reply Packet\n";
+				cout << "LP2PM_Client::UDPHandler() - Reply Packet\n";
 			}
 			return replyMsgHandler(packet);
 		case LP2PM_TYPE_CLOSING:
 			if(DEBUG){
-				cout << "LP2PM_Client::udpMsgHandler() - Closing Packet\n";
+				cout << "LP2PM_Client::UDPHandler() - Closing Packet\n";
 			}
 			return closingMsgHandler(packet);
 		default:
-			cerr << "[Error] LP2PM_Client::udpMsgHandler() - "
+			cerr << "[Error] LP2PM_Client::UDPHandler() - "
 				<< "Unknown UDP Msg Type: " << packet->getType() << endl;
 			return -1;
 	}
@@ -496,12 +481,12 @@ int LP2PM_Client::closingMsgHandler(LP2PM_Packet* packet){
 	return 0;
 }
 
-int LP2PM_Client::tcpMsgHandler(LP2PM_Packet* packet, LP2PM_User* user){
-	if(DEBUG) cout << "LP2PM_Client::tcpMsgHandler()" << endl;
+int LP2PM_Client::TCPHandler(LP2PM_Packet* packet, LP2PM_User* user){
+	if(DEBUG) cout << "LP2PM_Client::TCPHandler()" << endl;
 	switch(packet->getType()){
 		case LP2PM_TYPE_REQUEST:
 			if(DEBUG){
-				cout << "LP2PM_Client::tcpMsgHandler() - Request Packet\n";
+				cout << "LP2PM_Client::TCPHandler() - Request Packet\n";
 			}
 			if(CONSOLE_DEBUG){
 				sprintf(NEW_CONSOLE_LINE,
@@ -509,11 +494,11 @@ int LP2PM_Client::tcpMsgHandler(LP2PM_Packet* packet, LP2PM_User* user){
 						user->getUsername());
 				display->addNewConsoleLine(NEW_CONSOLE_LINE);
 			}
-			return establishMsgHandler(packet->getUsername(),
+			return requestMsgHandler(packet->getUsername(),
 									   packet->getHostname(),user);
 		case LP2PM_TYPE_ACCEPT:
 			if(DEBUG){
-				cout << "LP2PM_Client::tcpMsgHandler() - Accept Packet\n";
+				cout << "LP2PM_Client::TCPHandler() - Accept Packet\n";
 			}
 			if(CONSOLE_DEBUG){
 				sprintf(NEW_CONSOLE_LINE,
@@ -524,7 +509,7 @@ int LP2PM_Client::tcpMsgHandler(LP2PM_Packet* packet, LP2PM_User* user){
 			return acceptMsgHandler(user);
 		case LP2PM_TYPE_DECLINE:
 			if(DEBUG){
-				cout << "LP2PM_Client::tcpMsgHandler() - Decline Packet\n";
+				cout << "LP2PM_Client::TCPHandler() - Decline Packet\n";
 			}
 			if(CONSOLE_DEBUG){
 				sprintf(NEW_CONSOLE_LINE,
@@ -535,7 +520,7 @@ int LP2PM_Client::tcpMsgHandler(LP2PM_Packet* packet, LP2PM_User* user){
 			return userUnavailableMsgHandler(user);
 		case LP2PM_TYPE_DATA:
 			if(DEBUG){
-				cout << "LP2PM_Client::tcpMsgHandler() - Data Packet\n";
+				cout << "LP2PM_Client::TCPHandler() - Data Packet\n";
 			}
 			if(CONSOLE_DEBUG){
 				sprintf(NEW_CONSOLE_LINE,
@@ -546,7 +531,7 @@ int LP2PM_Client::tcpMsgHandler(LP2PM_Packet* packet, LP2PM_User* user){
 			return dataMsgHandler(packet,user);
 		case LP2PM_TYPE_MESSAGE:
 			if(DEBUG){
-				cout << "LP2PM_Client::tcpMsgHandler() - Message Packet\n";
+				cout << "LP2PM_Client::TCPHandler() - Message Packet\n";
 			}
 			if(CONSOLE_DEBUG){
 				sprintf(NEW_CONSOLE_LINE,
@@ -557,7 +542,7 @@ int LP2PM_Client::tcpMsgHandler(LP2PM_Packet* packet, LP2PM_User* user){
 			return messageMsgHandler(packet,user);
 		case LP2PM_TYPE_DISCONTINUE:
 			if(DEBUG){
-				cout << "LP2PM_Client::tcpMsgHandler() - Discontinue Packet\n";
+				cout << "LP2PM_Client::TCPHandler() - Discontinue Packet\n";
 			}
 			if(CONSOLE_DEBUG){
 				sprintf(NEW_CONSOLE_LINE,
@@ -567,7 +552,7 @@ int LP2PM_Client::tcpMsgHandler(LP2PM_Packet* packet, LP2PM_User* user){
 			}
 			return discontinueMsgHandler(user);
 		default:
-			cerr << "[Error] LP2PM_Client::tcpMsgHandler() - "
+			cerr << "[Error] LP2PM_Client::TCPHandler() - "
 				<< "Unknown TCP Msg Type: " << packet->getType() << endl;
 			return -1;
 	}
@@ -583,9 +568,8 @@ int LP2PM_Client::requestMsgHandler(	const char* username,
 	/*
 	 *	Get User Input on this
 	 */
-	if(user_availability_status < 0){
-		return sendDeclineMsg(user);
-	}
+	if(user_availability_status == STATUS_AWAY) return sendDeclineMsg(user);
+
 	users.retrieve(username,hostname)->userEstablished();
 	return sendAcceptComMsg(user);
 }
@@ -968,7 +952,7 @@ int LP2PM_Client::sendUDPPacketBroad(LP2PM_Packet* packet){
 	return result;
 }
 
-void  LP2PM_Client::connectToRequestedClient(char* hosts,int ports){
+void LP2PM_Client::connectToRequestedClient(char* hosts,int ports){
 	LP2PM_Packet packet;
 	packet.createDiscoveryMsg(UDP_port, TCP_port, hostname, username);
 	sendUDPPacketUni(&packet,hosts,ports);

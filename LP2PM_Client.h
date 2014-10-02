@@ -69,7 +69,17 @@ private:
 	 */
 	void enableUDPdirect( const char* );
 
+	/*
+	 *	Setup TCP communication (as a server)
+	 *
+	 *	@return	int				0 on success, -1 on fail
+	 */
 	int	establishTCPserver(); //int establishTCP();
+	
+	/*
+	 *	Change user availability status
+	 */
+	void changeStatus( int );
 
 public:
 	/*
@@ -79,8 +89,8 @@ public:
 	 *	@param4	int					UDP port #
 	 *	@param5	int					TCP port #
 	 */
-	LP2PM_Client(const char*,int,int,int,int);
-	LP2PM_Client(const char* );
+	LP2PM_Client( const char*, int, int, int, int);
+	LP2PM_Client( const char* );
 	~LP2PM_Client();
 	
 	/*
@@ -129,7 +139,24 @@ public:
 	int  TCPHandler(LP2PM_Packet*, LP2PM_User* );
 
 /* ---- LP2PM_Client UDP Message Handlers ---- */
+	/*
+	 *	Received a Discovery Message
+	 *		1) collect user information from packet
+	 *		2) I am acting as server now
+	 *			2a) create [server] socket
+	 *			2b) listen using socket
+	 *			2c) accpet and save new socket to user
+	 *		3) send Reply Message
+	 */
 	int discoveryMsgHandler(	LP2PM_Packet* );
+	
+	/*
+	 *	Received a Reply Message
+	 *		1) collect user information from packet
+	 *		2) I am acting as client now
+	 *			2a) create [client] socket
+	 *			2b) connect
+	 */
 	int replyMsgHandler(		LP2PM_Packet* );
 	int closingMsgHandler(		LP2PM_Packet* );
 
@@ -160,8 +187,8 @@ public:
 	int sendUDPPacketUni(LP2PM_Packet*,char*,int);
 	int sendUDPPacketBroad(LP2PM_Packet*);
 
-	void updateUserStatus(LP2PM_User*);
-	UserList* getUserList();
+	//void updateUserStatus(LP2PM_User*);
+	//UserList* getUserList();
 	
 	void connectToRequestedClient(char*, int);
 	
