@@ -357,10 +357,16 @@ int LP2PM_Display::parseUserHost(const char* cstring, char* user, char* host)
 	string s = "";
 	int i = 0;
 	for(; cstring[i]; ++i){
-		if(cstring[i] == '@'){ strcpy(user,s.c_str()); break; }
+		if(cstring[i] == '@'){
+			strncpy(user,s.c_str(),std::min(MAX_USERNAME_LENGTH, s.length()));
+			break;
+		}
 		else s+=cstring[i];
 	}
-	if(cstring[i] && cstring[i+1]) strcpy(host,cstring+i+1);
+	if(cstring[i] && cstring[i+1]){
+		strncpy(host,cstring+i+1,std::min(MAX_HOSTNAME_LENGTH,
+										  strlen(cstring+i+1)));
+	}
 	return 0;
 }
 
