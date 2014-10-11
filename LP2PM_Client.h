@@ -144,7 +144,7 @@ public:
 	 *		1) collect user information from packet
 	 *		2) I am acting as server now
 	 *			2a) create [server] socket
-	 *			2b) listen using socket
+	 *			2b) poll using socket
 	 *			2c) accpet and save new socket to user
 	 *		3) send Reply Message
 	 */

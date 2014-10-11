@@ -1,9 +1,12 @@
 #include "LP2PM_client.h"
 
 // TODO:
-// [ ] FIX TCP connection problems, discoveryMsgHandler & replyMsgHandler
-// [ ] keyboardReceived()
-// [ ] listenforAction()
+// [ ]	New User created when UDP is received, so how do I find that user when
+//		the same User connects via TCP? (All I have is a socket and IP address)
+//		and an IP address isn't good enough (multiple users on same IP).
+//		I need the username & hostname, or find them via sock_addr
+// [ ]	keyboardReceived()
+// [ ]	listenforAction()
 
 using namespace std;
 
@@ -54,7 +57,8 @@ int LP2PM_Client::start(){
 	display = NULL;
 }
 
-bool LP2PM_Client::checkSockaddr(sockaddr_in const &a, sockaddr_in const &b){ return a.sin_addr.s_addr == b.sin_addr.s_addr; }
+bool LP2PM_Client::checkSockaddr(sockaddr_in const &a, sockaddr_in const &b)
+{	return a.sin_addr.s_addr == b.sin_addr.s_addr; }
 
 int LP2PM_Client::getLocalHostInfo(char* name, struct in_addr* addr){
 	char Buffer[256];
@@ -85,13 +89,13 @@ int LP2PM_Client::establishUDPserver(){	if(DEBUG) cout << "LP2PM_Client::establi
 		close(TCP_socket);
 		return -1;
 	}
-	bzero(&udp_client_addr, sizeof(udp_client_addr));
+	bzero(&UDP_server_addr, sizeof(UDP_server_addr));
 	
-	udp_client_addr.sin_family = AF_INET;
-	udp_client_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	udp_client_addr.sin_port = htons(UDP_port);
-	if(bind(UDP_socket,(struct sockaddr*) &udp_client_addr,
-			sizeof(udp_client_addr)) < 0){
+	UDP_server_addr.sin_family = AF_INET;
+	UDP_server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	UDP_server_addr.sin_port = htons(UDP_port);
+	if(bind(UDP_socket,(struct sockaddr*) &UDP_server_addr,
+			sizeof(UDP_server_addr)) < 0){
 		cout << "LP2PM_Client::establishUDPserver() - bind error\n";
 		close(UDP_socket);
 		close(TCP_socket);
@@ -108,9 +112,11 @@ int LP2PM_Client::establishUDPserver(){	if(DEBUG) cout << "LP2PM_Client::establi
 	return 0;
 }
 
-void LP2PM_Client::enableUDPbroadcast(){	UDP_server_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST); }
+void LP2PM_Client::enableUDPbroadcast()
+{	UDP_server_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST); }
 
-void LP2PM_Client::enableUDPdirect(const char* hostname){	struct hostent* hp = gethostbyname(hostname);
+void LP2PM_Client::enableUDPdirect(const char* hostname){
+	struct hostent* hp = gethostbyname(hostname);
 	bcopy((char*)hp->h_addr, (char*) &UDP_server_addr.sin_addr, hp->h_length);
 }
 
@@ -134,6 +140,7 @@ int LP2PM_Client::establishTCPserver(){
 		close(TCP_socket);
 		return -1;
 	}
+	listen(TCP_socket,5);
 	return 0;
 }
 
@@ -412,20 +419,17 @@ int LP2PM_Client::UDPHandler(LP2PM_Packet* packet){
 	if(DEBUG) cout << "LP2PM_Client::UDPHandler()" << endl;
 	switch(packet->getType()){
 		case LP2PM_TYPE_DISCOVERY:
-			if(DEBUG){
-				cout << "LP2PM_Client::UDPHandler() - Discovery Packet\n";
-			}
+			if(DEBUG) cout << "LP2PM_Client::UDPHandler() - Discovery Packet\n";
 			return discoveryMsgHandler(packet);
+			
 		case LP2PM_TYPE_REPLY:
-			if(DEBUG){
-				cout << "LP2PM_Client::UDPHandler() - Reply Packet\n";
-			}
+			if(DEBUG) cout << "LP2PM_Client::UDPHandler() - Reply Packet\n";
 			return replyMsgHandler(packet);
+			
 		case LP2PM_TYPE_CLOSING:
-			if(DEBUG){
-				cout << "LP2PM_Client::UDPHandler() - Closing Packet\n";
-			}
+			if(DEBUG) cout << "LP2PM_Client::UDPHandler() - Closing Packet\n";
 			return closingMsgHandler(packet);
+			
 		default:
 			cerr << "[Error] LP2PM_Client::UDPHandler() - "
 				<< "Unknown UDP Msg Type: " << packet->getType() << endl;
@@ -447,6 +451,7 @@ int LP2PM_Client::discoveryMsgHandler(LP2PM_Packet* packet){
 	if(DEBUG) cout << "LP2PM_Client::discoveryMsgHandler() - Setting Up User\n";
 	user.init(packet->getUsername(), packet->getHostname(),
 			  packet->getUDPPort(), packet->getTCPPort());
+	sendReplyMsg(&user);
 	users.insert(user);
 	display->addNewHost(user.getUsername(),user.getHostname());
 	return 0;
@@ -575,26 +580,23 @@ int LP2PM_Client::requestMsgHandler(	const char* username,
 }
 
 int LP2PM_Client::acceptMsgHandler(LP2PM_User* user){
-	// find user based off of tcp_client_addr and user.tcp_connection
 	if(DEBUG) cout << "LP2PM_Client::acceptMsgHandler()" << endl;
 	if(!user){
 		cerr << "LP2PM_Client::acceptMsgHandler() - No User found\n";
 		return -1;
 	}
-	user->userEstablished();
+	user->userConnected();();
 	return 0;
 }
 
 int LP2PM_Client::declineMsgHandler(LP2PM_User* user){
-	// find user based off of tcp_client_addr and user.tcp_connection
-	// change status to unavailable
 	if(DEBUG) cout << "LP2PM_Client::userUnavailableMsgHandler()" << endl;
 	if(!user){
 		cerr << "LP2PM_Client::userUnavailableMsgHandler() - No User found\n";
 		return -1;
 	}
-	user->userUnavailable();
 	close(user->TCP_socket);
+	user->userDisconnected();
 	return 0;
 }
 	
@@ -629,6 +631,7 @@ int LP2PM_Client::discontinueMsgHandler(LP2PM_User* user){
 		return -1;
 	}
 	close(user->TCP_socket);
+	user->userDisconnected();
 	return 0;
 }
 
@@ -646,9 +649,7 @@ int LP2PM_Client::broadcastDiscoveryMsg(){
 			<< " Bytes\n";
 	}
 	if(CONSOLE_DEBUG){
-		sprintf(NEW_CONSOLE_LINE,
-				"LP2PM_Client::broadcastDiscoveryMsg() - Broadcasted %d Bytes",
-				r);
+		sprintf(NEW_CONSOLE_LINE,"Broadcasted Discovery Message (%d Bytes)", r);
 		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
 	return r;
@@ -667,9 +668,7 @@ int LP2PM_Client::broadcastClosingMsg(){
 			<< " Bytes\n";
 	}
 	if(CONSOLE_DEBUG){
-		sprintf(NEW_CONSOLE_LINE,
-				"LP2PM_Client::broadcastClosingMsg() - Broadcasted %d Bytes",
-				r);
+		sprintf(NEW_CONSOLE_LINE,"Broadcasted Closing Message (%d Bytes)", r);
 		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
 	return r;
@@ -692,9 +691,8 @@ int LP2PM_Client::sendReplyMsg(LP2PM_User* user){
 			<< user->getHostname() << ")\n";
 	}
 	if(CONSOLE_DEBUG){
-		sprintf(NEW_CONSOLE_LINE,
-				"LP2PM_Client::sendReplyMsg() - Sent %d Bytes",
-				r);
+		sprintf(NEW_CONSOLE_LINE, "Sent Reply Msg (%d Bytes) to %s@%s",
+				r,user->username,user->hostname);
 		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
 	return r;
@@ -717,8 +715,7 @@ int LP2PM_Client::sendRequestComMsg(LP2PM_User* user){
 			<< user->getHostname() << ")\n";
 	}
 	if(CONSOLE_DEBUG){
-		sprintf(NEW_CONSOLE_LINE,
-				"LP2PM_Client::sendRequestComMsg() - Sent %d Bytes to %s@%s",
+		sprintf(NEW_CONSOLE_LINE, "Sent Request Msg (%d Bytes) to %s@%s",
 				r,user->getUsername(),user->getHostname());
 		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
@@ -749,8 +746,7 @@ int LP2PM_Client::sendAcceptComMsg(LP2PM_User* user){
 			<< user->getHostname() << ")\n";
 	}
 	if(CONSOLE_DEBUG){
-		sprintf(NEW_CONSOLE_LINE,
-				"LP2PM_Client::sendAcceptComMsg() - Sent %d Bytes to %s@%s",
+		sprintf(NEW_CONSOLE_LINE, "Sent Accept Msg (%d Bytes) to %s@%s",
 				r,user->getUsername(),user->getHostname());
 		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
@@ -781,8 +777,7 @@ int LP2PM_Client::sendDeclineMsg(LP2PM_User* user){
 			<< user->getHostname() << ")\n";
 	}
 	if(CONSOLE_DEBUG){
-		sprintf(NEW_CONSOLE_LINE,
-				"LP2PM_Client::sendDeclineMsg() - Sent %d Bytes to %s@%s",
+		sprintf(NEW_CONSOLE_LINE, "Sent Decline Msg (%d Bytes) to %s@%s",
 				r,user->getUsername(),user->getHostname());
 		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
@@ -813,8 +808,7 @@ int LP2PM_Client::sendDataMsg(LP2PM_User* user, char* msg){
 			<< user->getHostname() << ")\n";
 	}
 	if(CONSOLE_DEBUG){
-		sprintf(NEW_CONSOLE_LINE,
-				"LP2PM_Client::sendDataMsg() - Sent %d Bytes to %s@%s",
+		sprintf(NEW_CONSOLE_LINE, "Sent Data Msg (%d Bytes) to %s@%s",
 				r,user->getUsername(),user->getHostname());
 		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
@@ -845,8 +839,7 @@ int LP2PM_Client::sendMessage(LP2PM_User* user, char* msg){
 		<< user->getHostname() << ")\n";
 	}
 	if(CONSOLE_DEBUG){
-		sprintf(NEW_CONSOLE_LINE,
-				"LP2PM_Client::sendMessage() - Sent %d Bytes to %s@%s",
+		sprintf(NEW_CONSOLE_LINE, "Sent Message (%d Bytes) to %s@%s",
 				r,user->getUsername(),user->getHostname());
 		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
@@ -877,15 +870,14 @@ int LP2PM_Client::sendDiscontinueComMsg(LP2PM_User* user){
 			<< user->getHostname() << ")\n";
 	}
 	if(CONSOLE_DEBUG){
-		sprintf(NEW_CONSOLE_LINE,
-				"LP2PM_Client::sendDiscontinueComMsg() - Sent %d Bytes to %s@%s",
+		sprintf(NEW_CONSOLE_LINE, "Sent Discontinue Msg (%d Bytes) to %s@%s",
 				r,user->getUsername(),user->getHostname());
 		display->addNewConsoleLine(NEW_CONSOLE_LINE);
 	}
 	if(r < 0){
 		if(DEBUG){
-			cout << "LP2PM_Client::sendDiscontinueComMsg() - sendTCPPacket returned -1 -"
-			<< " closing user socket...";
+			cout << "LP2PM_Client::sendDiscontinueComMsg() - sendTCPPacket "
+			<< "returned -1 - closing user socket...";
 		}
 		close(user->TCP_socket);
 	}
@@ -908,13 +900,16 @@ int LP2PM_Client::sendTCPPacket(LP2PM_User* user){
 
 int LP2PM_Client::sendUDPPacketUni(LP2PM_User* user){
 	if(DEBUG) cout << "LP2PM_Client::sendUDPPacketUni()" << endl;
+	return sendUDPPacketUni(user->outgoing_packet,user->hostname,user->UDP_port);
+	/*enableUDPdirect(user->hostname);
 	int result = sendto(UDP_socket, user->outgoing_packet.getData(0),
 						user->outgoing_packet.getSize(), 0, 
-						(struct sockaddr*)&(user->udp_connection),
-						sizeof(user->udp_connection));
+						(struct sockaddr*)&UDP_server_addr,
+						sizeof(UDP_server_addr));
 	if(result < 0)
 		cerr << "[Error] P2P_Client::sendUDPPacketUni() - sendto returned error\n";
-	return result;
+	enableUDPbroadcast();
+	return result;*/
 }
 
 int LP2PM_Client::sendUDPPacketUni(LP2PM_Packet* packet,char* hostname,int port)
