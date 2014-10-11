@@ -19,17 +19,20 @@ LP2PM_User::~LP2PM_User(){ shutdown(); }
 
 /* ---- LP2PM_User Setup ---- */
 int LP2PM_User::init(const char* user_name, const char* host_name, int udp_p,
-					 int tcp_p, int socket)
+					 int tcp_p)
 {	setUsername(user_name);
 	setHostname(host_name);
 	setUDPPort(udp_p);
 	setTCPPort(tcp_p);
-	establishUDP(hostname, UDP_port, socket);
-	establishTCP(hostname, TCP_port);
+	//establishUDP(hostname, UDP_port, socket);
+	// Just have everything in place to setup a TCP connection
+	//		- if they want to initiate the connection or us
+	//establishTCP(hostname, TCP_port);
+	//TCP_port = tcp_p;
 	return 0;
 }
 
-int LP2PM_User::establishUDP(const char* host_name, int port, int socket)
+/*int LP2PM_User::establishUDP(const char* host_name, int port, int socket)
 {	if(DEBUG) cout << "LP2PM_User::establishUDP()" << endl;
 	struct hostent* hp = gethostbyname(host_name);
 	
@@ -40,18 +43,18 @@ int LP2PM_User::establishUDP(const char* host_name, int port, int socket)
 	bcopy((char*)hp->h_addr, (char*)&udp_connection.sin_addr,hp->h_length);
 	udp_connection.sin_port = htons(port);
 	return 0;
-}
+}*/
 
-int LP2PM_User::establishTCP(const char* host_name, int port)
+int LP2PM_User::establishTCP()
 {	if(DEBUG) cout << "LP2PM_User::establishTCP()" << endl;
 	
-	struct hostent* user_host = gethostbyname(host_name);
+	struct hostent* user_host = gethostbyname(hostname);
 	if(!user_host){
 		return -1;
 		// get host by name failed
 	}
-	tcp_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if(tcp_socket < 0){
+	TCP_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if(TCP_socket < 0){
 		return -1;
 		// socket failed
 	}
@@ -61,7 +64,7 @@ int LP2PM_User::establishTCP(const char* host_name, int port)
 		  user_host->h_length);
 	
 	tcp_connection.sin_port = htons(port);
-	int s = connect(tcp_socket, (struct sockaddr*) &tcp_connection,
+	int s = connect(TCP_socket, (struct sockaddr*) &tcp_connection,
 					sizeof(tcp_connection));
 	if(s < 0){
 		return -1;
@@ -91,12 +94,9 @@ void LP2PM_User::setUDPPort(uint16_t t){ TCP_port = t; }
 void LP2PM_User::setTCPPort(uint16_t u){ UDP_port = u; }
 
 /* ---- LP2PM_User Status ---- */
-void LP2PM_User::userConnected()	{ user_connected	= 1;		}
-void LP2PM_User::userDisconnected()	{ user_connected	= -1;		}
-void LP2PM_User::userEstablished()	{ user_established	= 1;		}
-void LP2PM_User::userUnavailable()	{ user_established	= -1;		}
-bool LP2PM_User::isUserConnected()	{ return user_connected	> 0;	}
-bool LP2PM_User::isUserEstablished(){ return user_established > 0;	}
+void LP2PM_User::userConnected()	{ user_connected	= 1;	}
+void LP2PM_User::userDisconnected()	{ user_connected	= 0;	}
+bool LP2PM_User::isUserConnected()	{ return user_connected;	}
 
 const char* LP2PM_User::getUsername(){ return username; }
 const char* LP2PM_User::getHostname(){ return hostname; }
@@ -105,9 +105,10 @@ int LP2PM_User::getUDPPort() const { return UDP_port; }
 int LP2PM_User::getTCPPort() const { return TCP_port; }
 
 int LP2PM_User::shutdown()
-{	bzero((char*) &udp_connection, sizeof(udp_connection));
+{	//bzero((char*) &udp_connection, sizeof(udp_connection));
 	bzero((char*) &tcp_connection, sizeof(tcp_connection));
-	close(tcp_socket);
+	close(TCP_socket);
+	TCP_socket = 0;
 	bzero(username, MAX_USERNAME_LENGTH);
 	bzero(hostname, MAX_HOSTNAME_LENGTH);
 	user_connected = user_established = 0;
@@ -116,6 +117,7 @@ int LP2PM_User::shutdown()
 		bzero(msg_history[i],MAX_MSG_LENGTH);
 	incoming_packet.clearPacket();
 	outgoing_packet.clearPacket();
+	userDisconnected();
 	return 0;
 }
 

@@ -8,17 +8,16 @@
 
 class LP2PM_User{
 private:
-	char username[MAX_USERNAME_LENGTH];
-	char hostname[MAX_HOSTNAME_LENGTH];
-	int user_connected;		// -1 = disconnected, 0 = unknown, 1 = connected
-	int user_established;	// -1 = unavailable,  0 = unknown, 1 = established
-	char msg_history[MSG_HISTORY_LENGTH][MAX_MSG_LENGTH];
-	struct sockaddr_in tcp_connection;
-	struct sockaddr_in udp_connection;
-	uint16_t UDP_port;
-	uint16_t TCP_port;
+	char		username[MAX_USERNAME_LENGTH];
+	char		hostname[MAX_HOSTNAME_LENGTH];
+	int			user_connected;	// 0 = disconnected, 1 = connected
+	char		msg_history[MSG_HISTORY_LENGTH][MAX_MSG_LENGTH];
+	struct		sockaddr_in tcp_connection;
+	//struct sockaddr_in udp_connection;
+	uint16_t	UDP_port;
+	uint16_t	TCP_port;
 	
-	int establishUDP(const char*, int, int);// user's hostname, port #, socket
+	//int establishUDP(const char*, int, int);// user's hostname, port #, socket
 	int establishTCP(const char*, int);		// user's hostname, port #
 
 public:
@@ -83,24 +82,9 @@ public:
 	void		userDisconnected();
 	
 	/*
-	 *	Changes the user's established status to 1 (established)
-	 */
-	void		userEstablished();
-	
-	/*
-	 *	Changes the user's established status to -1 (unavailable)
-	 */
-	void		userUnavailable();
-	
-	/*
 	 *	Returns the connectivity status of the user
 	 */
 	bool		isUserConnected();
-	
-	/*
-	 *	Returns the establish status of the user
-	 */
-	bool		isUserEstablished();
 	
 
 /* ---- LP2PM_User Shutdown ---- */
@@ -195,6 +179,11 @@ public:
 	 *	@param	const char*			message
 	 */
 	void		addNewMessage(		const char*);
+	
+	/*
+	 *	Disconnect TCP connection from user
+	 */
+	void		disconnectTCPUser();
 	
 	//LP2PM_User operator = ( const LP2PM_User & );
 };
