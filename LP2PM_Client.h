@@ -135,7 +135,7 @@ public:
 	 */
 	int keyboardReceived();
 	
-	int  UDPHandler(LP2PM_Packet* );
+	int  UDPHandler(LP2PM_Packet*, const char* ip);
 	int  TCPHandler(LP2PM_Packet*, LP2PM_User* );
 
 /* ---- LP2PM_Client UDP Message Handlers ---- */
@@ -148,7 +148,7 @@ public:
 	 *			2c) accpet and save new socket to user
 	 *		3) send Reply Message
 	 */
-	int discoveryMsgHandler(	LP2PM_Packet* );
+	int discoveryMsgHandler(	LP2PM_Packet*, const char* ip );
 	
 	/*
 	 *	Received a Reply Message
@@ -157,8 +157,8 @@ public:
 	 *			2a) create [client] socket
 	 *			2b) connect
 	 */
-	int replyMsgHandler(		LP2PM_Packet* );
-	int closingMsgHandler(		LP2PM_Packet* );
+	int replyMsgHandler(		LP2PM_Packet*, const char* ip );
+	int closingMsgHandler(		LP2PM_Packet*, const char* ip );
 
 /* ---- LP2PM_Client TCP Message Handlers ---- */
 	int requestMsgHandler(		const char*, const char*, LP2PM_User* );
