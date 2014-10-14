@@ -66,6 +66,15 @@ public:
 	LP2PM_User* retrieve( const char*, const char* );
 	
 	/*
+	 *	returns the user based on username and IPv4
+	 *
+	 *	@param1	const char*		username
+	 *	@param2	const char*		IPv4
+	 *	@return	LP2PM_User*		pointer to user
+	 */
+	LP2PM_User* retrieveIPv4( const char*, const char* );
+	
+	/*
 	 *	returns user at specified index
 	 *
 	 *	@param1	int				index

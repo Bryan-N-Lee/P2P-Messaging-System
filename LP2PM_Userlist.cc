@@ -62,6 +62,14 @@ LP2PM_User* UserList::retrieve(const char* username, const char* hostname){
 	return NULL;
 }
 
+LP2PM_User* UserList::retrieveIPv4(const char* username, const char* ip){
+	for(UserNode* p = head; p; p = p->next){
+		if(compareUserHost(username,p->user.getUsername()) &&
+		   strcmp(p->user.checkIPv4(ip))) return &(p->user);
+	}
+	return NULL;
+}
+
 LP2PM_User* UserList::getUser(int index){
 	if(0 > index || index >= size) return NULL;
 	UserNode* p = head;
