@@ -5,9 +5,12 @@
 #include <unistd.h>
 #include <strings.h>
 #include "LP2PM_Macros.h"
+#include <algorithm>
 
 class LP2PM_User{
 private:
+	char		IPv4[16];
+	char		IPv6[40];
 	char		username[MAX_USERNAME_LENGTH];
 	char		hostname[MAX_HOSTNAME_LENGTH];
 	int			user_connected;	// 0 = disconnected, 1 = connected
@@ -85,6 +88,15 @@ public:
 	 *	Returns the connectivity status of the user
 	 */
 	bool		isUserConnected();
+	
+	/*
+	 *	check the user's IP address to given address
+	 */
+	bool		checkIPv4(const char*);
+	bool		checkIPv6(const char*);
+	
+	void		setIPv4(const char*);
+	void		setIPv6(const char*);
 	
 
 /* ---- LP2PM_User Shutdown ---- */

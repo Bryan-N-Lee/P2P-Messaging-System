@@ -6,6 +6,8 @@ LP2PM_User::LP2PM_User():
 user_connected(0),user_established(0),tcp_socket(0),UDP_port(0),TCP_port(0)
 {	bzero(username, MAX_USERNAME_LENGTH);
 	bzero(hostname, MAX_HOSTNAME_LENGTH);
+	bzero(IPv4, 16);
+	bzero(IPv6, 40);
 	for(int i = 0; i < MSG_HISTORY_LENGTH; ++i)
 		bzero(msg_history[i], MAX_MSG_LENGTH);
 	bzero((char*) &tcp_connection, sizeof(tcp_connection));
@@ -18,8 +20,8 @@ user_connected(0),user_established(0),tcp_socket(0),UDP_port(0),TCP_port(0)
 LP2PM_User::~LP2PM_User(){ shutdown(); }
 
 /* ---- LP2PM_User Setup ---- */
-int LP2PM_User::init(const char* user_name, const char* host_name, int udp_p,
-					 int tcp_p)
+int LP2PM_User::init(const char* user_name, const char* host_name,
+					 int udp_p, int tcp_p)
 {	setUsername(user_name);
 	setHostname(host_name);
 	setUDPPort(udp_p);
@@ -84,9 +86,7 @@ int LP2PM_User::setUsername(const char* user)
 
 int LP2PM_User::setHostname(const char* host)
 {	bzero(hostname, MAX_HOSTNAME_LENGTH);
-	if(strlen(host) > MAX_HOSTNAME_LENGTH)
-		strncpy(hostname,host,MAX_HOSTNAME_LENGTH);
-	else strcpy(hostname,host);
+	strncpy(hostname,host,std::max(strlen(host),MAX_HOSTNAME_LENGTH));
 	return strlen(hostname);
 }
 
@@ -97,6 +97,18 @@ void LP2PM_User::setTCPPort(uint16_t u){ UDP_port = u; }
 void LP2PM_User::userConnected()	{ user_connected	= 1;	}
 void LP2PM_User::userDisconnected()	{ user_connected	= 0;	}
 bool LP2PM_User::isUserConnected()	{ return user_connected;	}
+
+bool LP2PM_User::checkIPv4(const char* ip)
+{	return strcmp(IPv4,ip) == 0; }
+
+bool Lp2PM_User::checkIPv6(const char* ip)
+{	return strcmp(IPv6,ip) == 0; }
+
+void LP2PM_User::setIPv4(const char* ip)
+{	strncpy(IPv4,ip,std::max(strlen(ip),16)); }
+
+void LP2PM_User::setIPv6(const char* ip)
+{	strncpy(IPv6,ip,std::max(strlen(ip),40)); }
 
 const char* LP2PM_User::getUsername(){ return username; }
 const char* LP2PM_User::getHostname(){ return hostname; }
@@ -111,6 +123,8 @@ int LP2PM_User::shutdown()
 	TCP_socket = 0;
 	bzero(username, MAX_USERNAME_LENGTH);
 	bzero(hostname, MAX_HOSTNAME_LENGTH);
+	bzero(IPv4, 16);
+	bzero(IPv6, 40);
 	user_connected = user_established = 0;
 	UDP_port = TCP_port = 0;
 	for(int i = 0; i < MSG_HISTORY_LENGTH; ++i)
