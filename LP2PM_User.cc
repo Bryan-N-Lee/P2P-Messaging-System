@@ -3,7 +3,7 @@
 using namespace std;
 
 LP2PM_User::LP2PM_User():
-user_connected(0),user_established(0),tcp_socket(0),UDP_port(0),TCP_port(0)
+user_connected(0),TCP_socket(0),UDP_port(0),TCP_port(0)
 {	bzero(username, MAX_USERNAME_LENGTH);
 	bzero(hostname, MAX_HOSTNAME_LENGTH);
 	bzero(IPv4, 16);
@@ -96,7 +96,7 @@ void LP2PM_User::setTCPPort(uint16_t u){ UDP_port = u; }
 /* ---- LP2PM_User Status ---- */
 void LP2PM_User::userConnected()	{ user_connected	= 1;	}
 void LP2PM_User::userDisconnected()	{ user_connected	= 0;	}
-bool LP2PM_User::isUserConnected()	{ return user_connected;	}
+bool LP2PM_User::isConnected()		{ return user_connected;	}
 
 bool LP2PM_User::checkIPv4(const char* ip)
 {	return strcmp(IPv4,ip) == 0; }
