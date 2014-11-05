@@ -28,6 +28,7 @@ int UserList::remove(const char* username, const char* hostname){
 	if(strcmp(head->user.getUsername(),username) == 0 &&
 	   strcmp(head->user.getHostname(),hostname) == 0){
 		head = head->next;
+		t->user.shutdown();
 		delete t;
 		--size;
 		return 0;
@@ -36,6 +37,7 @@ int UserList::remove(const char* username, const char* hostname){
 		if(strcmp(p->user.getUsername(),username) == 0 &&
 		   strcmp(p->user.getHostname(),hostname) == 0){
 			t->next = p->next;
+			p->user.shutdown();
 			delete p;
 			--size;
 			return 0;
@@ -71,10 +73,27 @@ LP2PM_User* UserList::retrieveIPv4(const char* username, const char* ip){
 }
 
 LP2PM_User* UserList::getUser(int index){
+	static int last_index = 0;
+	static UserNode* last_p = head;
 	if(0 > index || index >= size) return NULL;
 	UserNode* p = head;
-	for(int i = 0; i < index && p; ++i, p = p->next)
-		if(index == i) return &(p->user);
+	int i = 0;
+	
+	if(index >= last_index){
+		i = last_index;
+		p = last_p;
+	}
+	else{
+		i = 0;
+		p = head;
+	}
+	
+	for(; i <= index && p; ++i, p = p->next)
+		if(index == i){
+			last_index = i;
+			last_p = p;
+			return &(p->user);
+		}
 	return NULL;
 }
 
