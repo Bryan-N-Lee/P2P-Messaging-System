@@ -1,10 +1,10 @@
 #include "LP2PM_client.h"
 
 // TODO:
-// [ ]	New User created when UDP is received, so how do I find that user when
-//		the same User connects via TCP? (All I have is a socket and IP address)
-//		and an IP address isn't good enough (multiple users on same IP).
-//		I need the username & hostname, or find them via sock_addr
+// [x]	Store the IP address of client when client first connects via UDP
+// [x]	When client connects via TCP (establish/Request is received), match
+//		client's IP and given Username to a UDP connected client with same IP
+//		address
 // [ ]	keyboardReceived()
 // [ ]	listenforAction()
 
@@ -16,7 +16,8 @@ init_broadcast_timeout(init),
 current_broadcast_timeout(init),
 max_broadcast_timeout(max),
 UDP_port(udp),TCP_port(tcp),
-user_availability_status(1){
+user_availability_status(1)
+{
 	struct in_addr thisAddr;
 	if(getLocalHostInfo(hostname,&thisAddr) == 0)
 		inet_ntop(AF_INET, &thisAddr, ip_addr, INET_ADDRSTRLEN);
@@ -82,7 +83,8 @@ bool LP2PM_Client::hostIsMe(char* user, char* host){
 	return (strcmp(user,username) == 0 && strcmp(host,hostname) == 0);
 }
 
-int LP2PM_Client::establishUDPserver(){	if(DEBUG) cout << "LP2PM_Client::establishUDP()" << endl;
+int LP2PM_Client::establishUDPserver(){
+	if(DEBUG) cout << "LP2PM_Client::establishUDP()" << endl;
 	UDP_socket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if(UDP_socket < 0){
 		cout << "LP2PM_Client::establishUDPserver() - socket error\n";
@@ -206,15 +208,18 @@ int LP2PM_Client::listenForAction(){
 			}
 			default:{ /* ---- Event Occurred ---- */
 				if(ufds[0].revents & POLLIN){ // UDP Message Received
-					if(DEBUG) cout << "LP2PM_Client::listenForAction() - UDP Event Received\n";
+					if(DEBUG) cout << "LP2PM_Client::listenForAction() - "
+									<< "UDP Event Received\n";
 					UDPMessageReceived();
 				}
 				else if(ufds[1].revents & POLLIN){ // TCP Message Received
-					if(DEBUG) cout << "LP2PM_Client::listenForAction() - TCP Event Received\n";
+					if(DEBUG) cout << "LP2PM_Client::listenForAction() - "
+									<< "TCP Event Received\n";
 					TCPMessageReceived();
 				}
 				else if(ufds[2].revents & POLLIN){ // Keyboard input received
-					if(DEBUG) cout << "LP2PM_Client::listenForAction() - Keyboard Event Received\n";
+					if(DEBUG) cout << "LP2PM_Client::listenForAction() - "
+									<< "Keyboard Event Received\n";
 					if(keyboardReceived()) return 0;
 				}
 				else
@@ -313,7 +318,6 @@ void LP2PM_Client::UDPMessageReceived(){
  */
 void LP2PM_Client::TCPMessageReceived(){
 	if(DEBUG) cout << "LP2PM_Client::TCPMessageReceived()" << endl;
-	//Result = setsockopt(DHandle, SOL_SOCKET, SO_BROADCAST, &OptionEnable, sizeof(OptionEnable));
 	int result = 0;
 	socklen_t clientLn;
 	clientLn = sizeof(TCP_addr);
@@ -321,7 +325,7 @@ void LP2PM_Client::TCPMessageReceived(){
 	LP2PM_Packet packet;
 	int new_tcp_socket;
 	new_tcp_socket = accept(TCP_socket,(struct sockaddr*)&TCP_addr, &clientLn);
-	// int port_number = ntohs(TCP_addr.sin_port);
+
 	if(temp_tcp_socket < 0){
 		cerr << "[Error] LP2PM_Client::TCPMessageReceived() "
 			<<"- TCP Accept returned error" << endl;
@@ -392,6 +396,11 @@ int LP2PM_Client::keyboardReceived(){
 						break;
 					case TO_TYPE_MESSAGE:
 						if(!u) {}// BAD USER INPUT
+						if(!(u->isConnected())){
+							// ADD CONSOLE MESSAGE
+							// [ User is not connected, message not sent ]
+							return 0;
+						}
 						sendMessage(u, dest_msg);
 						display->addNewMessage(username, dest_user, dest_msg);
 						break;
@@ -405,6 +414,7 @@ int LP2PM_Client::keyboardReceived(){
 						break;
 					case TO_TYPE_DECLINE:
 						sendDeclineMsg(u);
+						u->userDisconnected();
 						// ADD CONSOLE MESSAGE
 						break;
 					case TO_TYPE_DISCONTINUE:
@@ -588,9 +598,11 @@ int LP2PM_Client::requestMsgHandler(	const char* username,
 	/*
 	 *	Get User Input on this
 	 */
-	if(user_availability_status == STATUS_AWAY) return sendDeclineMsg(user);
-
-	users.retrieve(username,hostname)->userEstablished();
+	if(user_availability_status == STATUS_AWAY){
+		user->userDisconnected();
+		return sendDeclineMsg(user);
+	}
+	user->userConnected();
 	return sendAcceptComMsg(user);
 }
 
@@ -600,7 +612,7 @@ int LP2PM_Client::acceptMsgHandler(LP2PM_User* user){
 		cerr << "LP2PM_Client::acceptMsgHandler() - No User found\n";
 		return -1;
 	}
-	user->userConnected();();
+	user->userConnected();
 	return 0;
 }
 
@@ -610,7 +622,7 @@ int LP2PM_Client::declineMsgHandler(LP2PM_User* user){
 		cerr << "LP2PM_Client::userUnavailableMsgHandler() - No User found\n";
 		return -1;
 	}
-	close(user->TCP_socket);
+	//close(user->TCP_socket);
 	user->userDisconnected();
 	return 0;
 }
@@ -645,7 +657,7 @@ int LP2PM_Client::discontinueMsgHandler(LP2PM_User* user){
 		cerr << "LP2PM_Client::discontinueMsgHandler() - No User found\n";
 		return -1;
 	}
-	close(user->TCP_socket);
+	//close(user->TCP_socket);
 	user->userDisconnected();
 	return 0;
 }
@@ -916,15 +928,6 @@ int LP2PM_Client::sendTCPPacket(LP2PM_User* user){
 int LP2PM_Client::sendUDPPacketUni(LP2PM_User* user){
 	if(DEBUG) cout << "LP2PM_Client::sendUDPPacketUni()" << endl;
 	return sendUDPPacketUni(user->outgoing_packet,user->hostname,user->UDP_port);
-	/*enableUDPdirect(user->hostname);
-	int result = sendto(UDP_socket, user->outgoing_packet.getData(0),
-						user->outgoing_packet.getSize(), 0, 
-						(struct sockaddr*)&UDP_server_addr,
-						sizeof(UDP_server_addr));
-	if(result < 0)
-		cerr << "[Error] P2P_Client::sendUDPPacketUni() - sendto returned error\n";
-	enableUDPbroadcast();
-	return result;*/
 }
 
 int LP2PM_Client::sendUDPPacketUni(LP2PM_Packet* packet,char* hostname,int port)
