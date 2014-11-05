@@ -41,7 +41,7 @@ public:
 	 *	@param4 int				TCP port #
 	 *	@return	int				0 on success
 	 */
-	int			init(		const char*, const char*, int, int, int);
+	int			init( const char*, const char*, int, int, int );
 	
 	/*
 	 *	Set the username
@@ -87,7 +87,7 @@ public:
 	/*
 	 *	Returns the connectivity status of the user
 	 */
-	bool		isUserConnected();
+	bool		isConnected();
 	
 	/*
 	 *	check the user's IP address to given address
